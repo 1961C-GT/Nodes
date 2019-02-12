@@ -1,0 +1,68 @@
+DW1000Ranging Library Message SCHEMA (ANCHOR + TAG)
+
+Rx Msg Type	Incoming Frame Type 	TX Msg Type	Expecting Next	Dev Type	Notes
+BLINK		BLINK Frame		RANGE_INIT	POLL		ANCHOR		Creates a new device in the anchor's memory
+RANGE_INIT	LONG MAC Frame		~~~		~~~		TAG		Creates a new device in the tag's memory
+POLL		SHORT MAC Frame		POLL_ACK	RANGE		ANCHOR		0:POLL; 1:numDev; (2-3:destAddr; 4-5:replyTime) X numDev
+POLL_ACK	SHORT MAC Frame		RANGE		RANGE_REPORT	TAG		If receives from other than last device, it does nothing. Also transmits range as bcast
+RANGE		SHORT MAC Frame		RANGE_REPORT	POLL		ANCHOR		DRCT -- 0:POLL; 1:numDev; (2-3:destAddr; 4-8:POLLSnt; 9-13:POLLAckRec; 14-18:RngSnt) X numDev
+											BCAST -- 0:POLL; 1-5:POLLSnt; 6-10:POLLAckRec; 11-15:RngSnt
+											Actual Ranging calculation done when RANGE is received on an ANCHOR
+RANGE_REPORT	SHORT MAC Frame		~~~		~~~		TAG		0:POLL; 1-4:range; 5-8:RxPwr
+RANGE_FAILED	SHORT MAC Frame		~~~		?POLL_ACK?	TAG		Does nothing
+
+
+Transmit Poll Message Format:
+| Short Mac Frame Len |  0   |  1   |[ 2-3  |   4-5  ] X #dev
+|   Short Mac Frame   | POLL | #dev |[ addr | rplyTm ] X #dev
+
+Transmit POLL ACK Message Format:
+| Short Mac Frame Len |    0
+|   Short Mac Frame   | POLL_ACK
+
+Transmit Ranging Init Message Format:
+| Long Mac Frame Len |      0
+|   Long Mac Frame   | RANGING_INIT
+
+Transmit Range Message Format:
+BROADCAST:
+| Short Mac Frame Len |   0   |  1   |[ 2-3  |   4-8   |    9-13    | 14-18   ] X #dev
+|   Short Mac Frame   | RANGE | #dev |[ addr | POLLSnt | POLLAckRec | RANGESnt] X #dev
+OR (DIRECT)
+| Short Mac Frame Len |   0   |   1-5   |    6-10    | 11-15
+|   Short Mac Frame   | RANGE | POLLSnt | POLLAckRec | RANGESnt
+
+Transmit Range Report Message Format:
+| Short Mac Frame Len |      0       |  1-4  |  5-8
+|   Short Mac Frame   | RANGE_REPORT | range | rxPwr
+
+Transmit Range Failed Message Format:
+| Short Mac Frame Len |      0
+|   Short Mac Frame   | RANGE_FAILED
+
+Transmit Blink Message Format:
+| BLINK Frame Len |
+|   BLINK Frame   |
+
+
+
+0x9B             0x30         0x12
+ 1001 1011      0011 0000     0001 0010
+
+
+Message Structure (in bits):
+|  Byte 0  |    Byte 1   |    Byte 2    |    Byte 3 - 11 (Optional)
+|----------|-------------|--------------|--------------------------~~
+|   0 - 7  | 8 - 11 | 12 - 19 | 20 - 23 |          24 - 95
+| 10011011 |  From  |   Seq   |  Type   |     General Data (9B)
+|   0x9B   |
+
+Types:
+  0000: Announce      : 
+  0010: Range Request : 
+  0011: Range Respond : 
+  0100: Distance Com  : 
+  0101: Data Com      : 
+
+
+
