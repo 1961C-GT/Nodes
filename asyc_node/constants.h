@@ -86,8 +86,8 @@ struct Message {
 struct Settings {
 
   // --- Given Settings
-  byte mode[3];         // MODE_LONGDATA_RANGE_LOWPOWER
-  byte channel    : 3;  // CHANNEL_3 (1-7)
+  const byte * mode;         // MODE_LONGDATA_RANGE_LOWPOWER
+  byte channel;  // CHANNEL_3 (1-7)
   uint8_t n       : 4;  // Number of nodes in the network
   uint16_t t_rx   : 16; // Buffer time for changing rx/tx mode
   uint16_t t_b    : 16; // Buffer time between all blocks
@@ -107,4 +107,11 @@ struct Settings {
   uint32_t t_bc;        // Total time for each com block
   uint32_t t_fc;        // Total time for all com frames (all blocks)
 
+  uint32_t t_rn;        // The amount of time that this node waits after a RANGE_REQ before sending a RANGE_RESP
 };
+
+
+// Timer Defs
+const uint8_t _LED_TIMER = M0Timer.T5;
+const uint8_t _BLOCK_TIMER = M0Timer.T3;
+const uint8_t _FRAME_TIMER = M0Timer.T4;
