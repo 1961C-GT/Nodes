@@ -6,74 +6,75 @@
 // END IMPORTS
 
 // ========= Node IDs ========== //
-#define LEN_NODES_LIST 3
+#define LEN_NODES_LIST 2
 constexpr uint16_t nodeList[] = {
-  0x71E9, // RED - Base Station
-  0x726C, // BLUE
-  0xFDA0  // GREEN
+  0x726C, // RED - Base Station
+  0x6606,  // NODE 1
+  0x71E9, // BLUE
+  0xFDA0,  // GREEN
+
 };
+// ========= Node IDs ========== //
+
+
 uint8_t nodeNumber;
 boolean isBase;
 
+// Global Settings
 Settings settings;
-  // uint8_t n       : 4;  // Number of nodes in the network
-  // uint16_t t_rx   : 16; // Buffer time for changing rx/tx mode
-  // uint16_t t_b    : 16; // Buffer time between all blocks
-  //
-  // uint16_t t_r    : 16; // Time between range responses - longer than range_resp message length (~3ms)
-  //
-  // uint8_t n_com   : 8;  // Number of com frames per cycle
-  // uint16_t bits_c : 16; // Number of bits allowed in a com message
-  // uint16_t t_cl   : 16; // Time for a single com message - longer than com_msg length
-  //
-  // uint32_t t_sleep; // Time for the sleep frame
-  //
-  // // --- Calculated Settings (from given)
-  // uint32_t t_br;        // Total time for the each ranging block
-  // uint32_t t_fr;        // Total time for the ranging frame (all blocks)
-  //
-  // uint32_t t_bc;        // Total time for each com block
-  // uint32_t t_fc;        // Total time for all com frames (all blocks)
 
-
-// State
+// State control
 State state;
 
-// HELPER FUNCTIONS:
 // RX and TX Callback Functions
-volatile uint32_t rxTime;
-volatile uint32_t txTime;
+volatile uint32_t rxTimeM0;
+volatile uint32_t txTimeM0;
+DW1000Time rxTimeDW;
+DW1000Time txTimeDW;
 volatile boolean txFlag = false;
 volatile boolean rxFlag = false;
-void txHandle() { txTime = DW1000.getTxTime(); txFlag = true; /*Serial.print('t'); Serial.println(txTime);*/ }
-void rxHandle() { rxTime = DW1000.getRxTime(); rxFlag = true; /*Serial.print('r'); Serial.println(rxTime);*/ }
-boolean checkTx() { if (txFlag) { txFlag = false; return true; } return false; }
-boolean checkRx() { if (rxFlag) { rxFlag = false; return true; } return false; }
-
-void (* _TC3Callback)(TcCount16* tc);
+void rxHandle() { rxTimeM0 = DW1000.getRxTime(); rxFlag = true; /*Serial.print('r'); Serial.println(rxTimeM0);*/ }
+void txHandle() { txTimeM0 = DW1000.getTxTime(); txFlag = true; /*Serial.print('t'); Serial.println(txTimeM0);*/ }
+boolean checkRx() { if (rxFlag) { DW1000.getReceiveTimestamp(rxTimeDW); rxFlag = false; return true; } return false; }
+boolean checkTx() { if (txFlag) { DW1000.getTransmitTimestamp(txTimeDW); txFlag = false; return true; } return false; }
 
 // Timing Values
 DW1000Time timePollSent;
 DW1000Time * timePollReceived;
+DW1000Time t_r;
+
+// The difference in time between the DW1000 time and the M0 time. Calculated
+// using M0 - DW1000(micros). To get DW time from M0 time, use M0 - DWOffset.
+// To get M0 time from DW time, use DW + DWOffset.
+uint32_t DWOffset;
+
+// Messages
+Message rxMessage;
+Message txMessage;
+Message emptyMessage;
 
 // Testing
-volatile boolean reset;
 volatile boolean led;
 volatile boolean blink;
 
-DWMODE dwMode;
-DW1000Time msgDelay;
-DW1000Time t1;
-
+// Cycle Timing
 uint32_t cycleStart;
-boolean cycleValid;
+int cycleValid;
+uint8_t lastSequenceNumber;
+uint8_t rangeRequestFrom;
+uint8_t rangeRequestSeq;
+boolean transmitAuthorization;
+
+// Timers
+boolean frameTimerSet;
+boolean blockTimerSet;
 
 // Error Flags
 volatile boolean clkErr;
 volatile boolean rxFail;
 volatile boolean rxTimeout;
-
 uint8_t numClockErrors;
+
 
 void setup() {
 
@@ -82,33 +83,44 @@ void setup() {
   rxTimeout = false;
   numClockErrors = 0;
 
+  // emptyMessage = {
+  //   .from    = 0,
+  //   .type    = 0,
+  //   .seq     = 0,
+  //   .len     = 0,
+  //   .valid   = 0,
+  // };
+
   // === Define some default settigs =========================================//
   settings = {
-    .mode = DW1000.MODE_LONGDATA_RANGE_LOWPOWER,
+    .mode    = DW1000.MODE_LONGDATA_RANGE_LOWPOWER,
     .channel = DW1000.CHANNEL_3,
 
-    .n      = 3,
-    .t_rx   = 100,  // Buffer time for changing rx/tx mode // 100
-    .t_b    = 5000,  // Buffer time between all blocks // 1000
+    .n       = LEN_NODES_LIST,
+    .t_rx    = 4000,  // Buffer time for changing rx/tx mode // 1000
+    .t_b     = 1000,  // Buffer time between all blocks // 1000
 
-    .t_r    = 4000,  // Time between range responses - longer than range_resp // 3000
+    .t_r     = 4000,  // Time between range responses - longer than range_resp // 3000
                      //  message length (~3ms)
-    .n_com  = 3,     // Number of com frames per cycle
-    .bits_c = 16,    // Number of bits allowed in a com message
-    .t_cl   = 3000,  // Time for a single com message - longer than com_msg
+    .n_com   = 3,     // Number of com frames per cycle
+    .bits_c  = 16,    // Number of bits allowed in a com message
+    .t_cl    = 3000,  // Time for a single com message - longer than com_msg
                      //  length
-    .t_sleep = 5000, // Time for the sleep frame
+    .t_s     = 5000,  // Time for the sleep frame
   };
 
   // Set up our cycle information vars
-  uint32_t cycleStart = 0;
-  boolean cycleValid = false;
+  cycleStart = 0;
+  cycleValid = 0;
+  lastSequenceNumber = 0;
+
+  transmitAuthorization = false;
 
   pinMode(LED_PIN, OUTPUT);
 
   // Start the serial interface
   Serial.begin(115200);
-  // while(!Serial);
+  while(!Serial);
   Serial.println(F("### ASYC Node ###"));
 
   // #ifdef DEBUG
@@ -116,35 +128,10 @@ void setup() {
   //   while(!Serial);
   // #endif
 
-  // INIT DW1000
-  DW1000.begin(PIN_IRQ, PIN_RST);
-  DW1000.select(PIN_SS);
-
-
-  // Start a new DW1000 Config
-  DW1000.newConfiguration();
-
-  // Start with the default settings
-  DW1000.setDefaults();
-
-  // Set our addresses and note what our personal address is
-  uint16_t ownAddress = setAddresses(0xDECA); // Want to change to 1961 but the mac address stuff is hardcoded
-
-  // Enable our Mode
-  DW1000.enableMode(DW1000.MODE_LONGDATA_RANGE_LOWPOWER);
-
-  DW1000.interruptOnRxPreambleDetect(false);
-  DW1000.interruptOnTxPreambleSent(false);
-  DW1000.interruptOnRxFrameStart(true);
-  DW1000.interruptOnTxFrameStart(true);
-
-  // Commit the config to the DW1000
-  DW1000.commitConfiguration();
-
-
   // Figure out what node number we are
   // First see if we are the first address in the node list. If we are, then we
   // are also the base station
+  uint16_t ownAddress = getShortAddress();
   if (nodeList[0] == ownAddress) {
     isBase = true;
     nodeNumber = 0;
@@ -177,10 +164,43 @@ void setup() {
     }
   }
 
+  // INIT DW1000
+  #ifdef MNSLAC_NODE_M0
+    Serial.println("MNSLAC Node Hardware detected");
+    DW1000.begin(PIN_IRQ_NODE, PIN_RST_NODE);
+    DW1000.select(PIN_SS_NODE);
+  #else
+    Serial.println("Non MNSLAC Node Hardware detected");
+    DW1000.begin(PIN_IRQ_BREAD, PIN_RST_BREAD);
+    DW1000.select(PIN_SS_BREAD);
+  #endif
+
+
+  // Start a new DW1000 Config
+  DW1000.newConfiguration();
+
+  // Start with the default settings
+  DW1000.setDefaults();
+
+  // Set our addresses and note what our personal address is
+  setAddresses(0xDECA); // Want to change to 1961 but the mac address stuff is hardcoded
+
+  // Enable our Mode
+  DW1000.enableMode(DW1000.MODE_LONGDATA_RANGE_LOWPOWER);
+
+  DW1000.interruptOnRxPreambleDetect(false);
+  DW1000.interruptOnTxPreambleSent(false);
+  DW1000.interruptOnRxFrameStart(true);
+  DW1000.interruptOnTxFrameStart(true);
+
+  // Commit the config to the DW1000
+  DW1000.commitConfiguration();
+
   // === Calculate some additional settings based on the current settings === //
-  // Calculate the length of a single ranging block. Two times t_rx (one at the
-  // start and one at the end), one t_r for each node, and t_b buffer at the end
-  settings.t_br = settings.t_rx + settings.t_r + (settings.n * settings.t_r) + settings.t_rx + settings.t_b;
+  // Calculate the length of a single ranging block. One t_rx delay, one t_r
+  // delay to account for the intial RANGE_REQUEST message, one t_r for each
+  // node, and t_b buffer at the end
+  settings.t_br = settings.t_rx + settings.t_r + (settings.n * settings.t_r) + settings.t_b;
 
   // Calculate the length of the entire ranging frame. One ranging block for
   // each node in the network
@@ -189,7 +209,7 @@ void setup() {
   // Calculate the time for a single com block. Two times t_rx (one at the
   // start and one at the end), one t_cl (for the message) and t_b buffer at the
   // end
-  settings.t_bc = (2 * settings.t_rx) + settings.t_cl + settings.t_b;
+  settings.t_bc = settings.t_rx + settings.t_cl + settings.t_b;
 
   // Calculate the length of the enitre com frame. One com block per node in
   // the network, times the number of times we repeat the frame per cycle
@@ -197,7 +217,13 @@ void setup() {
 
   // The time that this node waits after hearing a RANGE_REQ before sending
   // a RANGE_RES in us
-  settings.t_rn = (settings.t_rx + settings.t_r) +  (settings.t_r * nodeNumber);
+  settings.t_rn = settings.t_r +  (settings.t_r * nodeNumber);
+
+  // Calculate the length of the entire sleep frame
+  settings.t_fs = settings.t_rx + settings.t_s + settings.t_b;
+
+  // Calculate the entire cycle length
+  settings.t_c  = settings.t_fs + settings.t_fr;
 
   DW1000Time timeList[settings.n];
   timePollReceived = timeList;
@@ -209,15 +235,15 @@ void setup() {
 
 
 
-  // if (!isBase)
-  //   while(!Serial);
+  if (isBase)
+    while(!Serial);
 
 
   Serial.println(F("Committed configuration ..."));
 
   // Print details about our node number
   Serial.print("Own Address:"); Serial.print(ownAddress, HEX);
-  Serial.print(" -- Node #:"); Serial.print(nodeNumber);
+  Serial.print(" -- Node #"); Serial.print(nodeNumber);
   if (isBase)
     Serial.println(" -- IS BASE");
   else
@@ -251,15 +277,12 @@ void setup() {
   DW1000.startReceive();
 
   // Init global vars
-  dwMode = IDLE;
-  reset = false;
   led = false;
 
   // Configure our timers
   // LED Timer
   M0Timer.setup(_LED_TIMER);
   M0Timer.attachTC5Handler(t_blink);
-  // M0Timer.start(150, M0Timer.T5);
 
   // Block Timer
   M0Timer.setup(_BLOCK_TIMER);
@@ -271,29 +294,39 @@ void setup() {
   M0Timer.setup(_FRAME_TIMER);
   M0Timer.setSingleUse(_FRAME_TIMER);
   M0Timer.stop(_FRAME_TIMER); // Not Needed
-    // M0Timer.attachTC3Handler(tec);
-  // M0Timer.start(500000,M0Timer.T3, true); // 500ms
 
-  // TODO Modify the M0Timer lib to allow us to "set up" a timer some other
-  // way. Starting and stopping it is overkill
-  // M0Timer.startTimer(100,3);
-  // M0Timer.stopTimer(3);
+  // Ensure that the timers start stopped and that our flag vars are set to
+  // false
+  stopTimers();
 
   // Calculate settings
-  msgDelay = DW1000Time(settings.t_rn, DW1000Time::MICROSECONDS);
+  t_r = DW1000Time(settings.t_rn, DW1000Time::MICROSECONDS);
 
-  Serial.print("Msg Delay: "); Serial.println(msgDelay);
-  Serial.print("Msg Delay: "); Serial.println(msgDelay.getAsMicroSeconds());
+  // Serial.print("Msg Delay: "); Serial.println(t_r);
+  // Serial.print("Msg Delay: "); Serial.println(t_r.getAsMicroSeconds());
+  //
+  // for (int i = 0; i < 32; i++) {
+  //   Serial.print("Seq: " ); Serial.print(i); Serial.print(" -- Time: "); Serial.println(getTimeAtSeq(i));
+  // }
+
+  DWOffset = 0; // DW1000Time(0, DW1000Time::MICROSECONDS);
+
+  state = { sleep };
 
   // Set our initial state
   if (isBase) {
-    state = { rb_range };
-  } else {
-    state = { ra_init };
+    // state = { rb_range };
+    cycleValid = 10;
+    cycleStart = micros();
+    lastSequenceNumber = 255;
+    transmitAuthorization = true;
   }
 
-  // Boot up delay
-  delay(10);
+  Serial.println("\033[0;35mThis is a test!");
+
+  // else {
+  //   state = { ra_init };
+  // }
 }
 
 
@@ -330,6 +363,27 @@ uint16_t setAddresses(uint16_t net) {
   return val4*256+val3;
 }
 
+uint16_t getShortAddress() {
+  // Get the Unique ID of this SAMD21
+  byte val1, val2, val3, val4, val5, val6, val7, val8;
+  byte *ptr = (byte *)0x0080A00C;
+  val1 = *ptr; ptr++;
+  val2 = *ptr; ptr++;
+  val3 = *ptr; ptr++;
+  val4 = *ptr; ptr++;
+
+  ptr = (byte *)0x0080A040;
+  val5 = *ptr; ptr++;
+  val6 = *ptr; ptr++;
+  val7 = *ptr; ptr++;
+  val8 = *ptr; ptr++;
+
+  // Build the EUI Address based on these bytes
+  byte addr[] = {val4, val3, val2, val1, val8, val7, val6, val5};
+
+  return val4*256+val3;
+}
+
 void blinkLoop() {
   M0Timer.startms(100, _LED_TIMER);
 }
@@ -346,15 +400,11 @@ void blinkTx() {
 }
 
 void receiver() {
-  // if (dwMode != RX) {
   	DW1000.newReceive();
   	DW1000.setDefaults();
   	// so we don't need to restart the receiver manually
   	DW1000.receivePermanently(true);
   	DW1000.startReceive();
-  //   dwMode = RX;
-  //   Serial.println("Entered RX Mode");
-  // }
 }
 
 // void transmitter() {
@@ -379,25 +429,16 @@ void clkErrHandler() {
 
 void t_blink(uint8_t t) {
   blink = true;
-  // Serial.print("Rx Time:"); Serial.print(DW1000.getRxTime());
-  // Serial.print(" - Tx Time:"); Serial.println(DW1000.getTxTime());
 }
-
-// uint32_t last = 0;
-// uint32_t goal = 100; //100000;
-// #define STEP 100
-// void tec(uint8_t t) {
-//   goal = 45600;
-//   uint32_t now = micros();
-//   M0Timer.start(45600, M0Timer.T3, M0Timer._intTime[M0Timer.T3]);
-//   Serial.print(goal); Serial.print(','); Serial.println(now - last);// - M0Timer._intTime[M0Timer.T3]);
-//   last = now;
-//   goal = goal + STEP;
-// }
 
 // Main Loop
 void loop() {
+  // Execute the next state
   state.next(&state);
+
+  // float voltage = analogRead(A2) * 0.0005900679758;
+  // Serial.println(getBattVoltage());
+
   // M0Timer.start(100, M0Timer.T5, true);
   if (blink) {
     // Serial.println("b");
@@ -408,7 +449,7 @@ void loop() {
   if (clkErr){
     clkErr = false;
     numClockErrors++;
-    Serial.println("DW1000 Clock Error Detected");
+    // Serial.println("DW1000 Clock Error Detected");
     if (numClockErrors > 3) {
       // Serial.println("Forcing System Soft Reboot");
       // setup();

@@ -5,9 +5,27 @@
 #define LEN_MAC 3
 
 // PIN DEFS
-#define PIN_RST 9
-#define PIN_IRQ 2
-#define PIN_SS 10
+#define PIN_RST_BREAD 9
+#define PIN_IRQ_BREAD 2
+#define PIN_SS_BREAD 10
+
+#define PIN_RST_NODE 8
+#define PIN_IRQ_NODE 2
+#define PIN_SS_NODE 10
+
+// Coef for calculating the battery voltage from the BATT pin.
+// 3.31 / 1024.0 * 2 = 0.00646484375
+#define BATT_MEAS_COEFF 0.00646484375
+
+// The minimum time that we are allowed to set a delay callback for. If the
+// needed delay is less than this value, then we forget the delay and move to
+// the next block or frame anyway
+#define MIN_DELAY 500 //150
+
+// The minimum time that we are allowed to set a delay transmit for. If the
+// needed delay is less than this value, then we forget the delay and transmit
+// as soon as possible instead
+#define MIN_TX_DELAY 4000
 
 // System time variables
 #define SINCE(value) (micros() - (uint32_t) value)
@@ -29,12 +47,6 @@
 //   C_EXIT
 // };
 
-
-enum DWMODE {
-  IDLE,
-  RX,
-  TX
-};
 
 typedef void state_fn(struct State *);
 struct State
@@ -61,6 +73,21 @@ char *MsgTypes[] = {
   "RNG REP",
   "COM MSG",
   "SETTING"
+};
+
+enum Block{
+  BLOCK_RANGE_ACCEPT,
+  BLOCK_RANGE_REQUEST,
+  BLOCK_COM,
+  BLOCK_SLEEP,
+  BLOCK_NONE
+};
+
+enum Frame{
+  FRAME_RANGE,
+  FRAME_COMS,
+  FRAME_SLEEP,
+  FRAME_NONE
 };
 
 //   COM MESSAGE CONTENTS
@@ -98,16 +125,21 @@ struct Settings {
   uint16_t bits_c : 16; // Number of bits allowed in a com message
   uint16_t t_cl   : 16; // Time for a single com message - longer than com_msg length
 
-  uint32_t t_sleep; // Time for the sleep frame
+  uint32_t t_s;         // Time for the sleep frame
 
   // --- Calculated Settings (from given)
   uint32_t t_br;        // Total time for the each ranging block
+
   uint32_t t_fr;        // Total time for the ranging frame (all blocks)
 
   uint32_t t_bc;        // Total time for each com block
   uint32_t t_fc;        // Total time for all com frames (all blocks)
 
   uint32_t t_rn;        // The amount of time that this node waits after a RANGE_REQ before sending a RANGE_RESP
+
+  uint32_t t_fs;        // total time for the Sleep Frame
+
+  uint32_t t_c;         // Total Cycle Length
 };
 
 
