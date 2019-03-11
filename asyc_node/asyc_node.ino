@@ -8,11 +8,11 @@
 // ========= Node IDs ========== //
 #define LEN_NODES_LIST 2
 constexpr uint16_t nodeList[] = {
-  0x726C, // RED - Base Station
+  0xDC19,
   0x6606,  // NODE 1
+  0x726C, // RED - Base Station
   0x71E9, // BLUE
   0xFDA0,  // GREEN
-
 };
 // ========= Node IDs ========== //
 
@@ -33,10 +33,28 @@ DW1000Time rxTimeDW;
 DW1000Time txTimeDW;
 volatile boolean txFlag = false;
 volatile boolean rxFlag = false;
-void rxHandle() { rxTimeM0 = DW1000.getRxTime(); rxFlag = true; /*Serial.print('r'); Serial.println(rxTimeM0);*/ }
-void txHandle() { txTimeM0 = DW1000.getTxTime(); txFlag = true; /*Serial.print('t'); Serial.println(txTimeM0);*/ }
-boolean checkRx() { if (rxFlag) { DW1000.getReceiveTimestamp(rxTimeDW); rxFlag = false; return true; } return false; }
-boolean checkTx() { if (txFlag) { DW1000.getTransmitTimestamp(txTimeDW); txFlag = false; return true; } return false; }
+void rxHandle() {
+  rxTimeM0 = DW1000.getRxTime();
+  rxFlag = true; /*Serial.print('r'); Serial.println(rxTimeM0);*/
+}
+void txHandle() {
+  txTimeM0 = DW1000.getTxTime();
+  txFlag = true; /*Serial.print('t'); Serial.println(txTimeM0);*/
+}
+boolean checkRx() {
+  if (rxFlag) {
+    DW1000.getReceiveTimestamp(rxTimeDW);
+    rxFlag = false;
+    return true;
+  } return false;
+}
+boolean checkTx() {
+  if (txFlag) {
+    DW1000.getTransmitTimestamp(txTimeDW);
+    txFlag = false;
+    return true;
+  } return false;
+}
 
 // Timing Values
 DW1000Time timePollSent;
@@ -101,11 +119,11 @@ void setup() {
     .t_b     = 1000,  // Buffer time between all blocks // 1000
 
     .t_r     = 4000,  // Time between range responses - longer than range_resp // 3000
-                     //  message length (~3ms)
+    //  message length (~3ms)
     .n_com   = 3,     // Number of com frames per cycle
     .bits_c  = 16,    // Number of bits allowed in a com message
     .t_cl    = 3000,  // Time for a single com message - longer than com_msg
-                     //  length
+    //  length
     .t_s     = 5000,  // Time for the sleep frame
   };
 
@@ -120,60 +138,43 @@ void setup() {
 
   // Start the serial interface
   Serial.begin(115200);
-  while(!Serial);
+  while (!Serial);
   Serial.println(F("### ASYC Node ###"));
 
-  // #ifdef DEBUG
-  // if (!isBase)
-  //   while(!Serial);
-  // #endif
-
-  // Figure out what node number we are
-  // First see if we are the first address in the node list. If we are, then we
-  // are also the base station
+  // Figure out where we are in the node list
   uint16_t ownAddress = getShortAddress();
-  if (nodeList[0] == ownAddress) {
-    isBase = true;
-    nodeNumber = 0;
+  nodeNumber = -1;
+  for (uint8_t i = 0; i < LEN_NODES_LIST; ++i) {
+    if (nodeList[i] == ownAddress) {
+      nodeNumber = i;
+      break;
+    }
   }
-  // If we are not the first in the list, then search the nodeList for our
-  // address
-  else {
-    nodeNumber = 255;
-    for (uint8_t i = 1; i < LEN_NODES_LIST; i++) {
 
-      // If we have found our adderss, set nodeNumber to i and leave the loop
-      if (nodeList[i] == ownAddress) {
-        nodeNumber = i;
-        break;
-      }
+  if (nodeNumber == 0) {
+    // If we're the first node in the list, assume we're the base
+    isBase = true;
+  } else if (nodeNumber == -1) {
+    // We're not in the node list, print out some debugging info
+    while (!Serial);
+    Serial.print("Error: Node ID not in list: "); Serial.println(ownAddress, HEX);
+    for (uint8_t i = 0; i < LEN_NODES_LIST; ++i) {
+      Serial.print("- "); Serial.println(nodeList[i], HEX);
     }
-
-    // IF we were unable to identify ourselves in the node list, then kill the
-    // program
-    if (nodeNumber == 255) {
-      while(!Serial);
-      Serial.print("Error: Node ID Not in List: "); Serial.println(ownAddress, HEX);
-      for (uint8_t i = 0; i < LEN_NODES_LIST; i++) {
-        Serial.print(" -- "); Serial.println(nodeList[i], HEX);
-      }
-      // Kill The Program
-      for (;;)
-        delay(1000);
-
-    }
+    // Spin our wheels doing nothing...
+    for (;;);
   }
 
   // INIT DW1000
-  #ifdef MNSLAC_NODE_M0
-    Serial.println("MNSLAC Node Hardware detected");
-    DW1000.begin(PIN_IRQ_NODE, PIN_RST_NODE);
-    DW1000.select(PIN_SS_NODE);
-  #else
-    Serial.println("Non MNSLAC Node Hardware detected");
-    DW1000.begin(PIN_IRQ_BREAD, PIN_RST_BREAD);
-    DW1000.select(PIN_SS_BREAD);
-  #endif
+#ifdef MNSLAC_NODE_M0
+  Serial.println("MNSLAC Node Hardware detected");
+  DW1000.begin(PIN_IRQ_NODE, PIN_RST_NODE);
+  DW1000.select(PIN_SS_NODE);
+#else
+  Serial.println("Non MNSLAC Node Hardware detected");
+  DW1000.begin(PIN_IRQ_BREAD, PIN_RST_BREAD);
+  DW1000.select(PIN_SS_BREAD);
+#endif
 
 
   // Start a new DW1000 Config
@@ -236,7 +237,7 @@ void setup() {
 
 
   if (isBase)
-    while(!Serial);
+    while (!Serial);
 
 
   Serial.println(F("Committed configuration ..."));
@@ -354,13 +355,13 @@ uint16_t setAddresses(uint16_t net) {
   DW1000.setEUI(addr);
 
   // Set the device address from the upper two bytes
-  DW1000.setDeviceAddress(val4*256+val3);
+  DW1000.setDeviceAddress(val4 * 256 + val3);
 
   // set the network ID based on the provided value
   DW1000.setNetworkId(net);
 
   // Return the device address we set
-  return val4*256+val3;
+  return val4 * 256 + val3;
 }
 
 uint16_t getShortAddress() {
@@ -381,7 +382,7 @@ uint16_t getShortAddress() {
   // Build the EUI Address based on these bytes
   byte addr[] = {val4, val3, val2, val1, val8, val7, val6, val5};
 
-  return val4*256+val3;
+  return val4 * 256 + val3;
 }
 
 void blinkLoop() {
@@ -400,11 +401,11 @@ void blinkTx() {
 }
 
 void receiver() {
-  	DW1000.newReceive();
-  	DW1000.setDefaults();
-  	// so we don't need to restart the receiver manually
-  	DW1000.receivePermanently(true);
-  	DW1000.startReceive();
+  DW1000.newReceive();
+  DW1000.setDefaults();
+  // so we don't need to restart the receiver manually
+  DW1000.receivePermanently(true);
+  DW1000.startReceive();
 }
 
 // void transmitter() {
@@ -446,7 +447,7 @@ void loop() {
     digitalWrite(LED_PIN, led);
     blink = false;
   }
-  if (clkErr){
+  if (clkErr) {
     clkErr = false;
     numClockErrors++;
     // Serial.println("DW1000 Clock Error Detected");
@@ -457,11 +458,11 @@ void loop() {
       // return;
     }
   }
-  if (rxFail){
+  if (rxFail) {
     rxFail = false;
     Serial.println("DW1000 Receive Failure Detected");
   }
-  if (rxTimeout){
+  if (rxTimeout) {
     rxTimeout = false;
     Serial.println("DW1000 Receive Timeout");
   }
