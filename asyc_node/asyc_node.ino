@@ -35,11 +35,11 @@ volatile boolean txFlag = false;
 volatile boolean rxFlag = false;
 void rxHandle() {
   rxTimeM0 = DW1000.getRxTime();
-  rxFlag = true; /*Serial.print('r'); Serial.println(rxTimeM0);*/
+  rxFlag = true; /*//Serial.print('r'); //Serial.println(rxTimeM0);*/
 }
 void txHandle() {
   txTimeM0 = DW1000.getTxTime();
-  txFlag = true; /*Serial.print('t'); Serial.println(txTimeM0);*/
+  txFlag = true; /*//Serial.print('t'); //Serial.println(txTimeM0);*/
 }
 boolean checkRx() {
   if (rxFlag) {
@@ -139,7 +139,7 @@ void setup() {
   // Start the serial interface
   Serial.begin(115200);
   while (!Serial);
-  Serial.println(F("### ASYC Node ###"));
+  //Serial.println(F("### ASYC Node ###"));
 
   // Figure out where we are in the node list
   uint16_t ownAddress = getShortAddress();
@@ -157,9 +157,9 @@ void setup() {
   } else if (nodeNumber == -1) {
     // We're not in the node list, print out some debugging info
     while (!Serial);
-    Serial.print("Error: Node ID not in list: "); Serial.println(ownAddress, HEX);
+    //Serial.print("Error: Node ID not in list: "); //Serial.println(ownAddress, HEX);
     for (uint8_t i = 0; i < LEN_NODES_LIST; ++i) {
-      Serial.print("- "); Serial.println(nodeList[i], HEX);
+      //Serial.print("- "); //Serial.println(nodeList[i], HEX);
     }
     // Spin our wheels doing nothing...
     for (;;);
@@ -167,26 +167,25 @@ void setup() {
 
   // INIT DW1000
 #ifdef MNSLAC_NODE_M0
-  Serial.println("MNSLAC Node Hardware detected");
+  //Serial.println("MNSLAC Node Hardware detected");
   DW1000.begin(PIN_IRQ_NODE, PIN_RST_NODE);
   DW1000.select(PIN_SS_NODE);
 #else
-  Serial.println("Non MNSLAC Node Hardware detected");
+  //Serial.println("Non MNSLAC Node Hardware detected");
   DW1000.begin(PIN_IRQ_BREAD, PIN_RST_BREAD);
   DW1000.select(PIN_SS_BREAD);
 #endif
 
 
-  // Start a new DW1000 Config
-  DW1000.newConfiguration();
+  /**
+     DW1000 Configuration
+  */
 
-  // Start with the default settings
+  DW1000.newConfiguration();
   DW1000.setDefaults();
 
-  // Set our addresses and note what our personal address is
-  setAddresses(0xDECA); // Want to change to 1961 but the mac address stuff is hardcoded
+  setAddresses(0xDECA);       // TODO: Want to change to 1961, but the MAC address stuff is hardcoded
 
-  // Enable our Mode
   DW1000.enableMode(DW1000.MODE_LONGDATA_RANGE_LOWPOWER);
 
   DW1000.interruptOnRxPreambleDetect(false);
@@ -194,10 +193,12 @@ void setup() {
   DW1000.interruptOnRxFrameStart(true);
   DW1000.interruptOnTxFrameStart(true);
 
-  // Commit the config to the DW1000
   DW1000.commitConfiguration();
 
-  // === Calculate some additional settings based on the current settings === //
+  /**
+     Calculated Settings
+  */
+
   // Calculate the length of a single ranging block. One t_rx delay, one t_r
   // delay to account for the intial RANGE_REQUEST message, one t_r for each
   // node, and t_b buffer at the end
@@ -231,24 +232,23 @@ void setup() {
 
   // while(!Serial);
   // *(timePollReceived + 0) = DW1000Time(settings.t_rn, DW1000Time::MICROSECONDS);
-  // Serial.println(*(timePollReceived + 0));
+  // //Serial.println(*(timePollReceived + 0));
   // =========================================================================//
 
 
 
+  // If we're the base, wait for a serial connection
   if (isBase)
     while (!Serial);
 
+  //Serial.println(F("Committed configuration ..."));
 
-  Serial.println(F("Committed configuration ..."));
-
-  // Print details about our node number
-  Serial.print("Own Address:"); Serial.print(ownAddress, HEX);
-  Serial.print(" -- Node #"); Serial.print(nodeNumber);
+  // Print details about us
+  //Serial.print("Own address: "); //Serial.print(ownAddress, HEX);
+  //Serial.print(" -- Node #"); //Serial.print(nodeNumber);
   if (isBase)
-    Serial.println(" -- IS BASE");
-  else
-    Serial.println();
+    //Serial.print(" -- IS BASE");
+  //Serial.println();
 
   // Attach DW1000 Handlers
   DW1000.attachSentHandler(txHandle);
@@ -257,17 +257,16 @@ void setup() {
   DW1000.attachReceiveTimeoutHandler(rxTimeoutHandler);
   DW1000.attachErrorHandler(clkErrHandler);
 
-
   // Print details about our config
   char msg[128];
   DW1000.getPrintableDeviceIdentifier(msg);
-  Serial.print("Device ID: "); Serial.println(msg);
+  //Serial.print("Device ID: "); //Serial.println(msg);
   DW1000.getPrintableExtendedUniqueIdentifier(msg);
-  Serial.print("Unique ID: "); Serial.println(msg);
+  //Serial.print("Unique ID: "); //Serial.println(msg);
   DW1000.getPrintableNetworkIdAndShortAddress(msg);
-  Serial.print("Network ID & Device Address: "); Serial.println(msg);
+  //Serial.print("Network ID & Device Address: "); //Serial.println(msg);
   DW1000.getPrintableDeviceMode(msg);
-  Serial.print("Device mode: "); Serial.println(msg);
+  //Serial.print("Device mode: "); //Serial.println(msg);
 
   printSettings(settings);
 
@@ -303,11 +302,11 @@ void setup() {
   // Calculate settings
   t_r = DW1000Time(settings.t_rn, DW1000Time::MICROSECONDS);
 
-  // Serial.print("Msg Delay: "); Serial.println(t_r);
-  // Serial.print("Msg Delay: "); Serial.println(t_r.getAsMicroSeconds());
+  // //Serial.print("Msg Delay: "); //Serial.println(t_r);
+  // //Serial.print("Msg Delay: "); //Serial.println(t_r.getAsMicroSeconds());
   //
   // for (int i = 0; i < 32; i++) {
-  //   Serial.print("Seq: " ); Serial.print(i); Serial.print(" -- Time: "); Serial.println(getTimeAtSeq(i));
+  //   //Serial.print("Seq: " ); //Serial.print(i); //Serial.print(" -- Time: "); //Serial.println(getTimeAtSeq(i));
   // }
 
   DWOffset = 0; // DW1000Time(0, DW1000Time::MICROSECONDS);
@@ -323,7 +322,7 @@ void setup() {
     transmitAuthorization = true;
   }
 
-  Serial.println("\033[0;35mThis is a test!");
+  //Serial.println("\033[0;35mThis is a test!");
 
   // else {
   //   state = { ra_init };
@@ -413,7 +412,7 @@ void receiver() {
 //     DW1000.newTransmit();
 //     DW1000.setDefaults();
 //     dwMode = TX;
-//     Serial.println("Entered TX Mode");
+//     //Serial.println("Entered TX Mode");
 //   // }
 // }
 
@@ -438,11 +437,11 @@ void loop() {
   state.next(&state);
 
   // float voltage = analogRead(A2) * 0.0005900679758;
-  // Serial.println(getBattVoltage());
+  // //Serial.println(getBattVoltage());
 
   // M0Timer.start(100, M0Timer.T5, true);
   if (blink) {
-    // Serial.println("b");
+    // //Serial.println("b");
     led = !led;
     digitalWrite(LED_PIN, led);
     blink = false;
@@ -450,9 +449,9 @@ void loop() {
   if (clkErr) {
     clkErr = false;
     numClockErrors++;
-    // Serial.println("DW1000 Clock Error Detected");
+    // //Serial.println("DW1000 Clock Error Detected");
     if (numClockErrors > 3) {
-      // Serial.println("Forcing System Soft Reboot");
+      // //Serial.println("Forcing System Soft Reboot");
       // setup();
       // NVIC_SystemReset();
       // return;
@@ -460,10 +459,10 @@ void loop() {
   }
   if (rxFail) {
     rxFail = false;
-    Serial.println("DW1000 Receive Failure Detected");
+    //Serial.println("DW1000 Receive Failure Detected");
   }
   if (rxTimeout) {
     rxTimeout = false;
-    Serial.println("DW1000 Receive Timeout");
+    //Serial.println("DW1000 Receive Timeout");
   }
 }

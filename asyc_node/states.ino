@@ -7,7 +7,7 @@ void sleep(struct State * state)
 {
   blinkInit();
   // #ifdef DEBUG
-    Serial.println(F("[State] ... -> SLEEP"));
+    //Serial.println(F("[State] ... -> SLEEP"));
   // #endif
 
   // Make sure that we do not have any block or frame timers set. (which means
@@ -24,7 +24,7 @@ void sleep(struct State * state)
   // sleep timeout. Otherwise we will have to wait until we can validate it
   // later.
   if (cycleValid > 0 || isBase) {
-    Serial.print("[SLEEP] - Cycle valid: "); Serial.println(cycleValid);
+    //Serial.print("[SLEEP] - Cycle valid: "); //Serial.println(cycleValid);
     if (isBase)
       cycleStart = micros();
 
@@ -36,7 +36,7 @@ void sleep(struct State * state)
     cycleValid = 0;
 
   // #ifdef DEBUG
-  Serial.println(F("[State] SLEEP -> SLEEP_LOOP"));
+  //Serial.println(F("[State] SLEEP -> SLEEP_LOOP"));
   // #endif
 }
 void sleep_loop(struct State * state)
@@ -51,34 +51,34 @@ void sleep_loop(struct State * state)
   // sleep frame so that if it is set (incorrecly), we will not leave sleep mode
   if (checkTimers(state, range_frame_init, sleep)) {
     cycleStart = micros() - settings.t_fs;
-    Serial.println("[SLEEP_LOOP] - Timer Triggered");
+    //Serial.println("[SLEEP_LOOP] - Timer Triggered");
     return;
   }
 
   // If we do not have a frame timer set but we DO have a valid cycle time, then
   // we should go ahead and set our frame timer
   if (!frameTimerSet && cycleValid) {
-    Serial.println("[SLEEP_LOOP] - Cycle Now Valid. Setting Frame Timer");
+    //Serial.println("[SLEEP_LOOP] - Cycle Now Valid. Setting Frame Timer");
     setFrameTimer(settings.t_fs, micros(), true);
   }
 }
 void sleep_decode(struct State * state)
 {
   // #ifdef DEBUG
-  Serial.println(F("[State] SLEEP -> SLEEP_DECODE"));
+  //Serial.println(F("[State] SLEEP -> SLEEP_DECODE"));
   // #endif
   blinkInit();
 
   // Set the defualt next state
   state->next = sleep_loop;
 
-  Serial.print("[SLEEP_DECODE] Rx @: "); Serial.println(rxTimeM0);
+  //Serial.print("[SLEEP_DECODE] Rx @: "); //Serial.println(rxTimeM0);
 
   // Get the message from the DW1000 and parse it
   rxMessage = getMessage();
   if (rxMessage.valid) {
 
-    Serial.print("[SLEEP_DECODE] Got Message: "); printMessage(rxMessage);
+    //Serial.print("[SLEEP_DECODE] Got Message: "); printMessage(rxMessage);
 
     // See if we can adjust our clock based on this message
     boolean adjusted = adjustClock(rxMessage, rxTimeM0, rxTimeDW.getAsMicroSeconds());
@@ -86,7 +86,7 @@ void sleep_decode(struct State * state)
     // If we did adjust our clock, then we should set (or reset) our frame
     // callback
     if (adjusted) {
-      Serial.println("[SLEEP_DECODE] Adjusted clock. Setting new frame timer");
+      //Serial.println("[SLEEP_DECODE] Adjusted clock. Setting new frame timer");
       setFrameTimer(settings.t_fs, micros(), true);
     }
   }
@@ -103,7 +103,7 @@ void range_frame_init(struct State * state)
   // Save the current time before we do any calculations
   uint32_t now = micros();
 
-  Serial.println("[STATE] SLEEP_LOOP -> RANGE_FRAME_INIT");
+  ////Serial.println("[STATE] SLEEP_LOOP -> RANGE_FRAME_INIT");
 
   // Go ahead and stop any block and frame timers now
   stopTimers();
@@ -117,15 +117,15 @@ void range_frame_init(struct State * state)
       settings.t_fs + settings.t_br * nodeNumber, now);
 
     if (!ret) {
-      Serial.print("[RANGE_FRAME_INIT] Callback Timer not set. Moving to alternate state (");
-      Serial.print(cycleStart); Serial.print(", ");
-      Serial.print(micros()); Serial.print(", ");
-      Serial.print(settings.t_fs + settings.t_fr); Serial.print(", ");
-      Serial.print(settings.t_fs + settings.t_br * nodeNumber); Serial.println(")");
+      ////Serial.print("[RANGE_FRAME_INIT] Callback Timer not set. Moving to alternate state (");
+      ////Serial.print(cycleStart); ////Serial.print(", ");
+      ////Serial.print(micros()); ////Serial.print(", ");
+      ////Serial.print(settings.t_fs + settings.t_fr); ////Serial.print(", ");
+      ////Serial.print(settings.t_fs + settings.t_br * nodeNumber); ////Serial.println(")");
     }
 
-    // Serial.print("Frame Time "); Serial.println(settings.t_fs + settings.t_fr);
-    // Serial.print("Block Time "); Serial.println(settings.t_fs + settings.t_br * nodeNumber);
+    // ////Serial.print("Frame Time "); ////Serial.println(settings.t_fs + settings.t_fr);
+    // ////Serial.print("Block Time "); ////Serial.println(settings.t_fs + settings.t_br * nodeNumber);
 
     // // Set up our frame timer for the range frame
     // boolean prompt = setFrameTimer(settings.t_fs + settings.t_fr, now);
@@ -145,7 +145,7 @@ void range_frame_init(struct State * state)
     // }
 
   } else {
-    Serial.println("[RANGE_FRAME_INIT] Clock Not Valid. Returning to sleep");
+    ////Serial.println("[RANGE_FRAME_INIT] Clock Not Valid. Returning to sleep");
     // If our cycle is not valid, then we need to wait in sleep instead
     state->next = sleep;
   }
@@ -169,7 +169,7 @@ void ra_init(struct State * state)
 
   // Proceed to loop state
   #ifdef DEBUG
-    Serial.println(F("[State] ... -> RA_INIT -> RA_INIT_LOOP"));
+    //Serial.println(F("[State] ... -> RA_INIT -> RA_INIT_LOOP"));
   #endif
 
   blinkLoop();
@@ -180,7 +180,7 @@ void ra_init_loop(struct State * state)
   // Check our timers. If one of them fires, then our state will be set as
   // needed, based on the values we pass in.
   if (checkTimers(state, sleep, rb_range)) {
-    Serial.println( "[RA_INIT_LOOP] - Timer Triggered");
+    //Serial.println( "[RA_INIT_LOOP] - Timer Triggered");
     return;
   }
 
@@ -200,7 +200,7 @@ void ra_init_loop(struct State * state)
 state_fn ra_decode;
 void ra_decode(struct State * state)
 {
-  Serial.println(F("[State] RA_INIT_LOOP -> RA_DECODE"));
+  //Serial.println(F("[State] RA_INIT_LOOP -> RA_DECODE"));
 
   blinkInit();
 
@@ -211,7 +211,7 @@ void ra_decode(struct State * state)
   rxMessage = getMessage();
 
   #ifdef DEBUG
-    Serial.print("[RA_DECOODE] Rx @: "); Serial.print(rxTimeM0); Serial.print(' ');
+    //Serial.print("[RA_DECOODE] Rx @: "); //Serial.print(rxTimeM0); //Serial.print(' ');
     printMessage(rxMessage);
   #endif
 
@@ -229,14 +229,14 @@ void ra_decode(struct State * state)
         Serial.println("[RA_DECOODE] Got Range Request");
         break;
       default:
-        Serial.println("[RA_DECOODE] BAD MESSAGE TYPE.");
+        //Serial.println("[RA_DECOODE] BAD MESSAGE TYPE.");
         // state->next = getState(rxMessage);
         break;
     }
 
     if (adj) {
 
-      Serial.println("[RA_DECOODE] Adjusting Timers From New Clock Settings");
+      //Serial.println("[RA_DECOODE] Adjusting Timers From New Clock Settings");
 
       // If we got a new clock adjustment, then we should reset our block timer
       // and frame timer to match this more accurate value
@@ -247,11 +247,11 @@ void ra_decode(struct State * state)
       // If we are late setting this timer, then we should proceed directly to
       // the next block
       if (!ret) {
-        Serial.print("[RA_DECOODE] Callback Timer not set. Moving to alternate state (");
-        Serial.print(cycleStart); Serial.print(", ");
-        Serial.print(micros()); Serial.print(", ");
-        Serial.print(settings.t_fs + settings.t_fr); Serial.print(", ");
-        Serial.print(settings.t_fs + settings.t_br * nodeNumber); Serial.println(")");
+        //Serial.print("[RA_DECOODE] Callback Timer not set. Moving to alternate state (");
+        //Serial.print(cycleStart); //Serial.print(", ");
+        //Serial.print(micros()); //Serial.print(", ");
+        //Serial.print(settings.t_fs + settings.t_fr); //Serial.print(", ");
+        //Serial.print(settings.t_fs + settings.t_br * nodeNumber); //Serial.println(")");
       }
     }
   }
@@ -268,7 +268,7 @@ void ra_resp(struct State * state)
 {
   blinkTx();
 
-  Serial.println(F("[State] RA_DECODE -> RA_RESP"));
+  //Serial.println(F("[State] RA_DECODE -> RA_RESP"));
 
   // Configure for a new transmit
   DW1000.newTransmit();
@@ -313,7 +313,7 @@ void ra_resp(struct State * state)
   // Start the message transmission
   DW1000.startTransmit();
 
-  Serial.println(F("[State] RA_RESP -> RA_RESP_LOOP"));
+  //Serial.println(F("[State] RA_RESP -> RA_RESP_LOOP"));
 
   // Proceed to loop state
   state->next = ra_resp_loop;
@@ -329,16 +329,16 @@ void ra_resp_loop(struct State * state)
 
   if(checkTx()) {
     // DW1000.readSystemEventStatusRegister();
-    // Serial.print("Late: "); Serial.println(DW1000.isLate());
+    // //Serial.print("Late: "); //Serial.println(DW1000.isLate());
 
     // DW1000Time txTime;
     // DW1000.getTransmitTimestamp(txTime);
     //
     // DW1000Time turn = (txTime - timePollSent).wrap();
-    // Serial.print("Turn: "); Serial.print(turn.getAsNanoSeconds());
-    // Serial.print("ns, Goal: "); Serial.println(t_r.getAsMicroSeconds());
-    // Serial.print("ns, TX:"); Serial.print(txTime.getAsMicroSeconds());
-    // Serial.print("ns, ");
+    // //Serial.print("Turn: "); //Serial.print(turn.getAsNanoSeconds());
+    // //Serial.print("ns, Goal: "); //Serial.println(t_r.getAsMicroSeconds());
+    // //Serial.print("ns, TX:"); //Serial.print(txTime.getAsMicroSeconds());
+    // //Serial.print("ns, ");
     receiver();
     state->next = ra_init;
   }
@@ -354,7 +354,7 @@ state_fn rb_range, rb_range_loop;
 void rb_range(struct State * state)
 {
   #ifdef DEBUG
-    Serial.print(F("[State] ... -> RB_RANGE: ")); Serial.println(micros());
+    //Serial.print(F("[State] ... -> RB_RANGE: ")); //Serial.println(micros());
   #endif
 
   // Set this block to end at the end of this node's range block. We do not
@@ -365,7 +365,7 @@ void rb_range(struct State * state)
 
   // If it is time to move on now, then do so
   if (!prompt) {
-    Serial.println("[RB_RANGE] Callback Timer not set. Moving to alternate state");
+    //Serial.println("[RB_RANGE] Callback Timer not set. Moving to alternate state");
     state->next = ra_init;
     return;
   }
@@ -416,11 +416,11 @@ void rb_range(struct State * state)
   // Start the transmission
   DW1000.startTransmit();
 
-  Serial.print("[RB_RANGE] - XMit Delay: " ); Serial.println((long) delay);
+  //Serial.print("[RB_RANGE] - XMit Delay: " ); //Serial.println((long) delay);
 
   // Proceed to loop state
   #ifdef DEBUG
-    Serial.println(F("[State] RB_RANGE -> RB_RANGE_LOOP"));
+    //Serial.println(F("[State] RB_RANGE -> RB_RANGE_LOOP"));
   #endif
   state->next = rb_range_loop;
 }
@@ -449,7 +449,7 @@ void rb_range_loop(struct State * state)
 state_fn rb_rec, rb_rec_loop;
 void rb_rec(struct State * state)
 {
-  Serial.println("[STATE] RB_RANGE_LOOP -> RB_REC");
+  //Serial.println("[STATE] RB_RANGE_LOOP -> RB_REC");
   blinkInit();
 
   // Enter receiver mode right away to catch messages as fast as possible
@@ -459,9 +459,9 @@ void rb_rec(struct State * state)
   // (which is the NEW block sync)
   boolean adjusted = adjustClock(txMessage, txTimeM0, txTimeDW.getAsMicroSeconds());
   if (!adjusted) {
-    Serial.print("[RB_REC] Err Clock Not Adjusted on TX: "); printMessage(txMessage);
+    //Serial.print("[RB_REC] Err Clock Not Adjusted on TX: "); printMessage(txMessage);
   } else {
-    Serial.println("[RB_REC] Set new Frame and Block Timers");
+    //Serial.println("[RB_REC] Set new Frame and Block Timers");
     // If we got a new clock adjustment, then we should reset our block timer
     // and frame timer to match this more accurate value
     boolean ret = updateTimers(state, sleep, ra_init,
@@ -471,11 +471,11 @@ void rb_rec(struct State * state)
     // If we are late setting this timer, then we should proceed directly to
     // the next block
     if (!ret) {
-      Serial.print("[RB_REC] Callback Timer not set. Moving to alternate state (");
-      Serial.print(cycleStart); Serial.print(", ");
-      Serial.print(micros()); Serial.print(", ");
-      Serial.print(settings.t_fs + settings.t_fr); Serial.print(", ");
-      Serial.print(settings.t_fs + settings.t_br * (nodeNumber + 1)); Serial.println(")");
+      //Serial.print("[RB_REC] Callback Timer not set. Moving to alternate state (");
+      //Serial.print(cycleStart); //Serial.print(", ");
+      //Serial.print(micros()); //Serial.print(", ");
+      //Serial.print(settings.t_fs + settings.t_fr); //Serial.print(", ");
+      //Serial.print(settings.t_fs + settings.t_br * (nodeNumber + 1)); //Serial.println(")");
       return;
     }
   }
@@ -483,7 +483,7 @@ void rb_rec(struct State * state)
   // Check our timers. If one of them fires, then our state will be set as
   // needed, based on the values we pass in.
   if (checkTimers(state, sleep, ra_init)) {
-    Serial.println( "[RB_REC] Timer Triggered");
+    //Serial.println( "[RB_REC] Timer Triggered");
     return;
   }
 
@@ -491,7 +491,7 @@ void rb_rec(struct State * state)
   timePollSent = txTimeDW;
 
   #ifdef DEBUG
-    Serial.println(F("[State] RB_REC -> RB_REC_LOOP"));
+    //Serial.println(F("[State] RB_REC -> RB_REC_LOOP"));
   #endif
 
   // Proceed to loop state
@@ -503,7 +503,7 @@ void rb_rec_loop(struct State * state)
   // Check our timers. If one of them fires, then our state will be set as
   // needed, based on the values we pass in.
   if (checkTimers(state, sleep, ra_init)) {
-    Serial.println( "[RB_REC_LOOP] Timer Triggered");
+    //Serial.println( "[RB_REC_LOOP] Timer Triggered");
     return;
   }
 
@@ -523,7 +523,7 @@ void rb_decode(struct State * state)
 {
   blinkInit();
   #ifdef DEBUG
-    Serial.print(F("[State] RB_REC_LOOP -> RB_DECODE: ")); Serial.println(micros());
+    //Serial.print(F("[State] RB_REC_LOOP -> RB_DECODE: ")); //Serial.println(micros());
   #endif
 
   // Set the defualt next state
@@ -532,7 +532,7 @@ void rb_decode(struct State * state)
   // Load the message into our rxMessage Object
   rxMessage = getMessage();
 
-  Serial.print("[RB_DECODE] Rx @: "); Serial.print(rxTimeM0); Serial.print(' ');
+  //Serial.print("[RB_DECODE] Rx @: "); //Serial.print(rxTimeM0); //Serial.print(' ');
   printMessage(rxMessage);
 
   // Ensure that the message is valid
@@ -555,20 +555,20 @@ void rb_decode(struct State * state)
           Serial.print("\tDistance: "); Serial.println(dist);
 
         } else {
-          Serial.print("[RB_DECODE] Out of Bounds Node ID: "); Serial.println(rxMessage.from);
+          //Serial.print("[RB_DECODE] Out of Bounds Node ID: "); //Serial.println(rxMessage.from);
         }
 
         break;
       case SETTINGS:
         // TODO
       default:
-        Serial.print("[RB_DECODE] BAD MESSAGE TYPE: "); Serial.println(rxMessage.type);
+        //Serial.print("[RB_DECODE] BAD MESSAGE TYPE: "); //Serial.println(rxMessage.type);
         break;
     }
 
     // If we adjused our clock, then reset our callback timers
     if (adjusted) {
-      Serial.println("[RB_DECODE] - Set new Frame and Block Timers");
+      //Serial.println("[RB_DECODE] - Set new Frame and Block Timers");
 
       // If we got a new clock adjustment, then we should reset our block timer
       // and frame timer to match this more accurate value
@@ -579,11 +579,11 @@ void rb_decode(struct State * state)
       // If we are late setting this timer, then we should proceed directly to
       // the next block
       if (!ret) {
-        Serial.print("[RB_DECODE] Callback Timer not set. Moving to alternate state (");
-        Serial.print(cycleStart); Serial.print(", ");
-        Serial.print(micros()); Serial.print(", ");
-        Serial.print(settings.t_fs + settings.t_fr); Serial.print(", ");
-        Serial.print(settings.t_fs + settings.t_br * (nodeNumber + 1)); Serial.println(")");
+        //Serial.print("[RB_DECODE] Callback Timer not set. Moving to alternate state (");
+        //Serial.print(cycleStart); //Serial.print(", ");
+        //Serial.print(micros()); //Serial.print(", ");
+        //Serial.print(settings.t_fs + settings.t_fr); //Serial.print(", ");
+        //Serial.print(settings.t_fs + settings.t_br * (nodeNumber + 1)); //Serial.println(")");
         return;
       }
     }
@@ -592,7 +592,7 @@ void rb_decode(struct State * state)
   // // Check our timers. If one of them fires, then our state will be set as
   // // needed, based on the values we pass in.
   // if (checkTimers(state, sleep, ra_init)) {
-  //   Serial.println( "[RB_DECODE] Timer Triggered");
+  //   //Serial.println( "[RB_DECODE] Timer Triggered");
   //   return;
   // }
 }

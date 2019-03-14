@@ -26,12 +26,12 @@ int freeMemory() {
 
 // Print a message struct to the console
 void printMessage(Message msg) {
-  Serial.print('['); Serial.print(msg.valid); Serial.print("] ");
-  Serial.print("From ("); Serial.print(msg.from);
-  Serial.print(") Seq ("); Serial.print(msg.seq);
-  Serial.print(") Type ("); Serial.print(MsgTypes[msg.type]);
-  Serial.print(") Data {"); DW1000.printPrettyHex(msg.data, msg.len, false);
-  Serial.print("} Memory: "); Serial.println(freeMemory());
+  //Serial.print('['); //Serial.print(msg.valid); //Serial.print("] ");
+  //Serial.print("From ("); //Serial.print(msg.from);
+  //Serial.print(") Seq ("); //Serial.print(msg.seq);
+  //Serial.print(") Type ("); //Serial.print(MsgTypes[msg.type]);
+  //Serial.print(") Data {"); DW1000.printPrettyHex(msg.data, msg.len, false);
+  //Serial.print("} Memory: "); //Serial.println(freeMemory());
 }
 
 // Get a message from the DW1000 and return its message format
@@ -128,22 +128,22 @@ uint32_t getRangeRecDelay(uint8_t nodeNum, Settings s) {
 }
 
 void printSettings(Settings s) {
-  Serial.print("Settings [n:"); Serial.print(s.n);
-  Serial.print(", t_rx:"); Serial.print(s.t_rx);
-  Serial.print(", t_b:"); Serial.print(s.t_b);
-  Serial.print(", t_r:"); Serial.print(s.t_r);
-  Serial.print(", t_cl:"); Serial.print(s.t_cl);
-  Serial.print(", t_br:"); Serial.print(s.t_br);
-  Serial.print(", t_fr:"); Serial.print(s.t_fr);
-  Serial.print(", t_bc:"); Serial.print(s.t_bc);
-  Serial.print(", t_fc:"); Serial.print(s.t_fc);
-  Serial.print(", t_rn:"); Serial.print(s.t_rn);
-  Serial.print(", t_s:"); Serial.print(s.t_s);
-  Serial.print(", t_fs:"); Serial.print(s.t_fs);
-  Serial.print(", t_c:"); Serial.print(s.t_c);
-  Serial.print(", n_com:"); Serial.print(s.n_com);
-  Serial.print(", bits_c:"); Serial.print(s.bits_c);
-  Serial.println("]");
+  //Serial.print("Settings [n:"); //Serial.print(s.n);
+  //Serial.print(", t_rx:"); //Serial.print(s.t_rx);
+  //Serial.print(", t_b:"); //Serial.print(s.t_b);
+  //Serial.print(", t_r:"); //Serial.print(s.t_r);
+  //Serial.print(", t_cl:"); //Serial.print(s.t_cl);
+  //Serial.print(", t_br:"); //Serial.print(s.t_br);
+  //Serial.print(", t_fr:"); //Serial.print(s.t_fr);
+  //Serial.print(", t_bc:"); //Serial.print(s.t_bc);
+  //Serial.print(", t_fc:"); //Serial.print(s.t_fc);
+  //Serial.print(", t_rn:"); //Serial.print(s.t_rn);
+  //Serial.print(", t_s:"); //Serial.print(s.t_s);
+  //Serial.print(", t_fs:"); //Serial.print(s.t_fs);
+  //Serial.print(", t_c:"); //Serial.print(s.t_c);
+  //Serial.print(", n_com:"); //Serial.print(s.n_com);
+  //Serial.print(", bits_c:"); //Serial.print(s.bits_c);
+  //Serial.println("]");
 }
 
 float runningTotal;
@@ -163,13 +163,13 @@ float computeRange(DW1000Time& rec, uint8_t fromId) {
   float distance = tof.getAsMeters();
 
 
-  // Serial.print("Distance Data: Total("); Serial.print(total.getAsNanoSeconds());
-  // Serial.print("NodeID: "); Serial.print(fromId);
-  // Serial.print("\tTurn("); Serial.print(turn.getAsNanoSeconds());
-  // Serial.print("), TOF("); Serial.print(tof.getAsNanoSeconds());
-  // Serial.print("); Sent:"); Serial.print(timePollSent.getAsMicroSeconds());
-  // Serial.print(", Received:"); Serial.print(rec.getAsMicroSeconds());
-  // Serial.print(", Dist:"); Serial.println(distance);
+  // //Serial.print("Distance Data: Total("); //Serial.print(total.getAsNanoSeconds());
+  // //Serial.print("NodeID: "); //Serial.print(fromId);
+  // //Serial.print("\tTurn("); //Serial.print(turn.getAsNanoSeconds());
+  // //Serial.print("), TOF("); //Serial.print(tof.getAsNanoSeconds());
+  // //Serial.print("); Sent:"); //Serial.print(timePollSent.getAsMicroSeconds());
+  // //Serial.print(", Received:"); //Serial.print(rec.getAsMicroSeconds());
+  // //Serial.print(", Dist:"); //Serial.println(distance);
 
   return distance;
 }
@@ -422,21 +422,21 @@ boolean setFrameTimer(uint32_t cycleDelay, uint32_t now, boolean wrapTime = fals
   // the callback delay (referenced to the cycle start time)
   long delay = getDelayMicros(cycleDelay, now);
 
-  // Serial.print("Frame Timer Pre: "); Serial.println((long) delay);
-  // Serial.print("cycleStart "); Serial.println(cycleStart);
-  // Serial.print("now "); Serial.println(now);
-  // Serial.print("cycleDelay"); Serial.println(cycleDelay);
+  // //Serial.print("Frame Timer Pre: "); //Serial.println((long) delay);
+  // //Serial.print("cycleStart "); //Serial.println(cycleStart);
+  // //Serial.print("now "); //Serial.println(now);
+  // //Serial.print("cycleDelay"); //Serial.println(cycleDelay);
   //
   // if (delay < 0) {
-  //   Serial.println("Less than 0");
+  //   //Serial.println("Less than 0");
   // } else if (delay == 0) {
-  //   Serial.println("Equal to 0");
+  //   //Serial.println("Equal to 0");
   // } else if (delay > 0) {
-  //   Serial.println("Greater than 0");
+  //   //Serial.println("Greater than 0");
   // } else
-  //   Serial.println("idk");
+  //   //Serial.println("idk");
 
-  // Serial.println((long)delay);
+  // //Serial.println((long)delay);
 
   // If wrapping is enabled, then we ensure that the delay is greater than
   // min delay by wrapping an ENTIRE cycle time onto it until that is the case.
@@ -448,7 +448,7 @@ boolean setFrameTimer(uint32_t cycleDelay, uint32_t now, boolean wrapTime = fals
       delay += settings.t_c; //settings.t_fs + settings.t_fr + settings.t_fc;
     }
   } else if (delay < MIN_DELAY) {
-    // Serial.println("FT False");
+    // //Serial.println("FT False");
     return false;
   }
 
@@ -458,9 +458,9 @@ boolean setFrameTimer(uint32_t cycleDelay, uint32_t now, boolean wrapTime = fals
   M0Timer.start(delay, _FRAME_TIMER, now);
   frameTimerSet = true;
 
-  Serial.print("Frame Timer set: "); Serial.print((long) delay);
-  Serial.print(", "); Serial.print(cycleDelay);
-  Serial.print(", "); Serial.println(now);
+  //Serial.print("Frame Timer set: "); //Serial.print((long) delay);
+  //Serial.print(", "); //Serial.print(cycleDelay);
+  //Serial.print(", "); //Serial.println(now);
 
   return true;
 }
@@ -471,13 +471,13 @@ boolean setBlockTimer(uint32_t cycleDelay, uint32_t now) {
   long delay = getDelayMicros(cycleDelay, now);
 
   // if (delay < 0) {
-  //   Serial.println("Less than 0");
+  //   //Serial.println("Less than 0");
   // } else if (delay == 0) {
-  //   Serial.println("Equal to 0");
+  //   //Serial.println("Equal to 0");
   // } else if (delay > 0) {
-  //   Serial.println("Greater than 0");
+  //   //Serial.println("Greater than 0");
   // } else
-  //   Serial.println("idk");
+  //   //Serial.println("idk");
 
   if (delay < MIN_DELAY) {
     return false;
@@ -489,9 +489,9 @@ boolean setBlockTimer(uint32_t cycleDelay, uint32_t now) {
   M0Timer.start(delay, _BLOCK_TIMER, micros());
   blockTimerSet = true;
 
-  Serial.print("Block Timer set: "); Serial.print((long) delay);
-  Serial.print(", "); Serial.print(cycleDelay);
-  Serial.print(", "); Serial.println(now);
+  //Serial.print("Block Timer set: "); //Serial.print((long) delay);
+  //Serial.print(", "); //Serial.print(cycleDelay);
+  //Serial.print(", "); //Serial.println(now);
 
   return true;
 }
@@ -526,13 +526,13 @@ boolean updateTimers(struct State * state, state_fn * frameState, state_fn * blo
 boolean checkTimers(struct State * state, state_fn * frameState, state_fn * blockState) {
   // Frame Timer
   if (M0Timer.getFired(_FRAME_TIMER)) {
-    Serial.print("Frame Timer Fired: "); Serial.println(micros());
+    //Serial.print("Frame Timer Fired: "); //Serial.println(micros());
     state->next = frameState;
     return true;
   }
 
   if (M0Timer.getFired(_BLOCK_TIMER)) {
-    Serial.print("Block Timer Fired: "); Serial.println(micros());
+    //Serial.print("Block Timer Fired: "); //Serial.println(micros());
     state->next = blockState;
     return true;
   }
