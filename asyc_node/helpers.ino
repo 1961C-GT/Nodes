@@ -455,6 +455,7 @@ boolean setFrameTimer(uint32_t cycleDelay, uint32_t now, boolean wrapTime = fals
     }
   } else if (delay < MIN_DELAY) {
     // Serial.println("FT False");
+    sprintf(medium_buf, "> Frame Timer Delay too Short %ld", delay); pcln(medium_buf);
     return false;
   }
 
@@ -484,6 +485,7 @@ boolean setBlockTimer(uint32_t cycleDelay, uint32_t now) {
   long delay = getDelayMicros(cycleDelay, now);
 
   if (delay < MIN_DELAY) {
+    sprintf(medium_buf, "> Block Timer Delay too Short %ld", delay); pcln(medium_buf);
     return false;
   }
 

@@ -277,7 +277,7 @@ void setup() {
   settings.t_fs = settings.t_rx + settings.t_s + settings.t_b;
 
   // Calculate the entire cycle length
-  settings.t_c  = settings.t_fs + settings.t_fr;
+  settings.t_c  = settings.t_fs + settings.t_fr + settings.t_fc;
 
   DW1000Time timeList[settings.n];
   timePollReceived = timeList;
