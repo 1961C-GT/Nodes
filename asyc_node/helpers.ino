@@ -35,12 +35,14 @@ void printMessage(Message msg) {
   sprintf(medium_buf, "| → %-8s0x%.*X", "Data: ", msg.len, msg.data); pcln(medium_buf);
   sprintf(medium_buf, "| → %-8s%d", "Mem: ", freeMemory()); pcln(medium_buf);
   dec();
-  // Serial.print('['); Serial.print(msg.valid); Serial.print("] ");
-  // Serial.print("From ("); Serial.print(msg.from);
-  // Serial.print(") Seq ("); Serial.print(msg.seq);
-  // Serial.print(") Type ("); Serial.print(MsgTypes[msg.type]);
-  // Serial.print(") Data {"); DW1000.printPrettyHex(msg.data, msg.len, false);
-  // Serial.print("} Memory: "); Serial.println(freeMemory());
+}
+
+void receiver() {
+  	DW1000.newReceive();
+  	DW1000.setDefaults();
+  	// so we don't need to restart the receiver manually
+  	DW1000.receivePermanently(true);
+  	DW1000.startReceive();
 }
 
 // Get a message from the DW1000 and return its message format
@@ -155,40 +157,6 @@ void printSettings(Settings s) {
   sprintf(medium_buf, "%-8s%d", "bits_c:", s.bits_c); pcln(medium_buf, C_RED);
   endSection();
   pcln("");
-
-  // sprintf(small_buf, "n: %d", s.n); scln(small_buf);
-  // sprintf(small_buf, "t_rx: %d", s.t_rx); scln(small_buf);
-  // sprintf(small_buf, "t_b: %d", s.t_b); scln(small_buf);
-  // sprintf(small_buf, "t_r: %d", s.t_r); scln(small_buf);
-  // sprintf(small_buf, "t_cl: %d", s.t_cl); scln(small_buf);
-  // sprintf(small_buf, "t_br: %d", s.t_br); scln(small_buf);
-  // sprintf(small_buf, "t_fr: %d", s.t_fr); scln(small_buf);
-  // sprintf(small_buf, "t_bc: %d", s.t_bc); scln(small_buf);
-  // sprintf(small_buf, "t_fc: %d", s.t_fc); scln(small_buf);
-  // sprintf(small_buf, "t_rn: %d", s.t_rn); scln(small_buf);
-  // sprintf(small_buf, "t_s: %d", s.t_s); scln(small_buf);
-  // sprintf(small_buf, "t_fs: %d", s.t_fs); scln(small_buf);
-  // sprintf(small_buf, "t_c: %d", s.t_c); scln(small_buf);
-  // sprintf(small_buf, "n_com: %d", s.n_com); scln(small_buf);
-  // sprintf(small_buf, "bits_c: %d", s.bits_c); scln(small_buf);
-
-  //
-  // Serial.print("Settings [n:"); Serial.print(s.n);
-  // Serial.print(", t_rx:"); Serial.print(s.t_rx);
-  // Serial.print(", t_b:"); Serial.print(s.t_b);
-  // Serial.print(", t_r:"); Serial.print(s.t_r);
-  // Serial.print(", t_cl:"); Serial.print(s.t_cl);
-  // Serial.print(", t_br:"); Serial.print(s.t_br);
-  // Serial.print(", t_fr:"); Serial.print(s.t_fr);
-  // Serial.print(", t_bc:"); Serial.print(s.t_bc);
-  // Serial.print(", t_fc:"); Serial.print(s.t_fc);
-  // Serial.print(", t_rn:"); Serial.print(s.t_rn);
-  // Serial.print(", t_s:"); Serial.print(s.t_s);
-  // Serial.print(", t_fs:"); Serial.print(s.t_fs);
-  // Serial.print(", t_c:"); Serial.print(s.t_c);
-  // Serial.print(", n_com:"); Serial.print(s.n_com);
-  // Serial.print(", bits_c:"); Serial.print(s.bits_c);
-  // Serial.println("]");
 }
 
 float runningTotal;
@@ -206,7 +174,6 @@ double computeRange(DW1000Time& rec, uint8_t fromId) {
   DW1000Time tof = (total - turn) / 2;
 
   float distance = tof.getAsMeters();
-
 
   // Serial.print("Distance Data: Total("); Serial.print(total.getAsNanoSeconds());
   // Serial.print("NodeID: "); Serial.print(fromId);
@@ -470,22 +437,6 @@ boolean setFrameTimer(uint32_t cycleDelay, uint32_t now, boolean wrapTime = fals
   // the callback delay (referenced to the cycle start time)
   long delay = getDelayMicros(cycleDelay, now);
 
-  // Serial.print("Frame Timer Pre: "); Serial.println((long) delay);
-  // Serial.print("cycleStart "); Serial.println(cycleStart);
-  // Serial.print("now "); Serial.println(now);
-  // Serial.print("cycleDelay"); Serial.println(cycleDelay);
-  //
-  // if (delay < 0) {
-  //   Serial.println("Less than 0");
-  // } else if (delay == 0) {
-  //   Serial.println("Equal to 0");
-  // } else if (delay > 0) {
-  //   Serial.println("Greater than 0");
-  // } else
-  //   Serial.println("idk");
-
-  // Serial.println((long)delay);
-
   // If wrapping is enabled, then we ensure that the delay is greater than
   // min delay by wrapping an ENTIRE cycle time onto it until that is the case.
   // The means that the time will always be the NEXT cycleDelay offset from a
@@ -519,15 +470,6 @@ boolean setBlockTimer(uint32_t cycleDelay, uint32_t now) {
   // Set the delay based on the cycle start time, the offset (now time), and
   // the callback delay (referenced to the cycle start time)
   long delay = getDelayMicros(cycleDelay, now);
-
-  // if (delay < 0) {
-  //   Serial.println("Less than 0");
-  // } else if (delay == 0) {
-  //   Serial.println("Equal to 0");
-  // } else if (delay > 0) {
-  //   Serial.println("Greater than 0");
-  // } else
-  //   Serial.println("idk");
 
   if (delay < MIN_DELAY) {
     return false;
@@ -599,47 +541,3 @@ boolean checkTimers(struct State * state, state_fn * frameState, state_fn * bloc
 
   return false;
 }
-
-// void resetTimers(uint8_t seq, uint32_t offsetTime) {
-//   switch (getFrameFromSeq(seq, settings)) {
-//     case FRAME_RANGE:
-//         M0Timer.start(settings.t_br, _BLOCK_TIMER, rxTime);
-//       break;
-//     case FRAME_COMS:
-//         M0Timer.start(settings.t_bc, _BLOCK_TIMER, rxTime);
-//       break;
-//     case FRAME_SLEEP:
-//         M0Timer.stop(_BLOCK_TIMER);
-//         M0Timer.start(settings.t_s, _FRAME_TIMER, rxTime);
-//       break;
-//     default:
-//       break;
-//   }
-// }
-
-/*
-struct Settings {
-
-  // --- Given Settings
-  const byte * mode;         // MODE_LONGDATA_RANGE_LOWPOWER
-  byte channel;  // CHANNEL_3 (1-7)
-  uint8_t n       : 4;  // Number of nodes in the network
-  uint16_t t_rx   : 16; // Buffer time for changing rx/tx mode
-  uint16_t t_b    : 16; // Buffer time between all blocks
-
-  uint16_t t_r    : 16; // Time between range responses - longer than range_resp message length (~3ms)
-
-  uint8_t n_com   : 8;  // Number of com frames per cycle
-  uint16_t bits_c : 16; // Number of bits allowed in a com message
-  uint16_t t_cl   : 16; // Time for a single com message - longer than com_msg length
-
-  uint32_t t_sleep; // Time for the sleep frame
-
-  // --- Calculated Settings (from given)
-  uint32_t t_br;        // Total time for the each ranging block
-  uint32_t t_fr;        // Total time for the ranging frame (all blocks)
-
-  uint32_t t_bc;        // Total time for each com block
-  uint32_t t_fc;        // Total time for all com frames (all blocks)
-
-};*/

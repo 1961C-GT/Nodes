@@ -29,15 +29,8 @@ Settings settings;
 State state;
 
 // LED Vars
-// Led_Mode led_red = MODE_OFF;
-// Led_Mode led_green = MODE_OFF;
-// Led_Mode led_blue = MODE_OFF;
-// Led_Mode led_aux = MODE_OFF;
 boolean led_rst;
-// boolean led_chirp_red;
-// boolean led_chirp_green;
-// boolean led_chirp_blue;
-// boolean led_chirp_aux;
+uint16_t tlist[] = {0, 0, 0, 0};
 
 // RX and TX Callback Functions
 volatile uint32_t rxTimeM0;
@@ -356,13 +349,6 @@ void setup() {
   // Calculate settings
   t_r = DW1000Time(settings.t_rn, DW1000Time::MICROSECONDS);
 
-  // Serial.print("Msg Delay: "); Serial.println(t_r);
-  // Serial.print("Msg Delay: "); Serial.println(t_r.getAsMicroSeconds());
-  //
-  // for (int i = 0; i < 32; i++) {
-  //   Serial.print("Seq: " ); Serial.print(i); Serial.print(" -- Time: "); Serial.println(getTimeAtSeq(i));
-  // }
-
   DWOffset = 0; // DW1000Time(0, DW1000Time::MICROSECONDS);
 
   state = { sleep };
@@ -376,16 +362,9 @@ void setup() {
     transmitAuthorization = true;
   }
 
-  //Serial.println("\033[0;35mThis is a test!");
-
-  // else {
-  //   state = { ra_init };
-  // }
-
   // Reset indentation
   rst();
 }
-
 
 // Set the EUI based on this SAMD21G18's unique ID. Also set the
 // device address based on the unique ID and set the network ID as given
@@ -441,38 +420,6 @@ uint16_t getShortAddress() {
   return val4*256+val3;
 }
 
-// void blinkLoop() {
-//   M0Timer.startms(100, _LED_TIMER);
-// }
-//
-// void blinkInit() {
-//   // M0Timer.start(10, M0Timer.T5);
-//   M0Timer.stop(_LED_TIMER);
-//   blink = false;
-//   digitalWrite(LED_PIN, HIGH);
-// }
-//
-// void blinkTx() {
-//   M0Timer.startms(25, _LED_TIMER);
-// }
-
-void receiver() {
-  	DW1000.newReceive();
-  	DW1000.setDefaults();
-  	// so we don't need to restart the receiver manually
-  	DW1000.receivePermanently(true);
-  	DW1000.startReceive();
-}
-
-// void transmitter() {
-//   // if (dwMode != TX) {
-//     DW1000.newTransmit();
-//     DW1000.setDefaults();
-//     dwMode = TX;
-//     Serial.println("Entered TX Mode");
-//   // }
-// }
-
 // Handlers
 void rxFailHandler() {
   rxFail = true;
@@ -484,12 +431,7 @@ void clkErrHandler() {
   clkErr = true;
 }
 
-uint16_t tlist[] = {
-  0,
-  0,
-  0,
-  0
-};
+
 
 void setLed(Led led, Led_Mode mode) {
   switch (mode) {
@@ -638,33 +580,6 @@ void manage_led(Led led) {
       break;
   }
 }
-
-/*
-float r, g, b, t;
-r = 0; g = 0; b = 0; t = 0;
-
-while(!Serial) {
-  t ++;
-  if(t < 50){
-    r = t*5.1;
-  }else if(t <= 400){
-    r = 255-(t-50)*0.7285714286;
-  }else{
-    r = 0;
-    g = 0;
-    b = 0;
-  }
-
-  if(t > 600){
-    t = 0;
-  }
-
-  analogWrite(BOARD_RGB_RED, (int)r);
-  // analogWrite(BOARD_RGB_GREEN, g);
-  // analogWrite(BOARD_RGB_BLUE, b);
-
-  // delay(1);
-}*/
 
 
 // Main Loop
