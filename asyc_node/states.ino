@@ -618,7 +618,7 @@ void rb_decode(struct State * state)
           DW1000.getReceiveTimestamp(rec);
           double dist = computeRange(rec, rxMessage.from);
 
-          led_chirp_aux = true;
+          setLed(LED_AUX, MODE_CHIRP);
 
           pcln("Message Type: Range RESP", C_PURPLE);
           sprintf(medium_buf, "| → From: %d", rxMessage.from); pcln(medium_buf, C_PURPLE);

@@ -29,15 +29,15 @@ Settings settings;
 State state;
 
 // LED Vars
-Led_Mode led_red = MODE_OFF;
-Led_Mode led_green = MODE_OFF;
-Led_Mode led_blue = MODE_OFF;
-Led_Mode led_aux = MODE_OFF;
+// Led_Mode led_red = MODE_OFF;
+// Led_Mode led_green = MODE_OFF;
+// Led_Mode led_blue = MODE_OFF;
+// Led_Mode led_aux = MODE_OFF;
 boolean led_rst;
-boolean led_chirp_red;
-boolean led_chirp_green;
-boolean led_chirp_blue;
-boolean led_chirp_aux;
+// boolean led_chirp_red;
+// boolean led_chirp_green;
+// boolean led_chirp_blue;
+// boolean led_chirp_aux;
 
 // RX and TX Callback Functions
 volatile uint32_t rxTimeM0;
@@ -149,11 +149,10 @@ void setup() {
   // float r, g, b, t;
   // r = 0; g = 0; b = 0; t = 0;
 
-  // led_red = MODE_RAMP;
+  setLed(LED_RED, MODE_RAMP);
   while(!Serial);
   // delay(1000);
-  // led_red = MODE_OFF;
-  // led_aux = MODE_BLINK;
+  setLed(LED_RED, MODE_OFF);
 
 
   header("ASYC NODE", C_BLACK, BG_YELLOW);
@@ -485,79 +484,125 @@ void clkErrHandler() {
   clkErr = true;
 }
 
-uint16_t tr = 0;
-uint16_t tg = 0;
-uint16_t tb = 0;
-uint16_t taux = 0;
+uint16_t tlist[] = {
+  0,
+  0,
+  0,
+  0
+};
+
+void setLed(Led led, Led_Mode mode) {
+  switch (mode) {
+    // For the MODE OFF and MODE ON cases, we can just set them
+    // as needed right away
+    case MODE_OFF:
+      digitalWrite(led_pin_list[led], LOW);
+      led_modes[led] = MODE_NULL;
+      break;
+    case MODE_ON:
+      digitalWrite(led_pin_list[led], HIGH);
+      led_modes[led] = MODE_NULL;
+      break;
+    default:
+      // Set the mode of this led accordingly
+      led_modes[led] = mode;
+      break;
+  }
+  // Alert the watchdog with the updated flag
+  led_updated[led] = true;
+
+}
 
 void t_leds(uint8_t t) {
+  // If led_rst, then set the led time counters to 0
   if(led_rst){
-    tr = 0;
-    tg = 0;
-    tb = 0;
-    taux = 0;
+    for (int i = 0; i < 4; i++)
+      tlist[i] = 0;
   }
 
-  if(led_chirp_red == true){
-    digitalWrite(BOARD_RGB_RED, HIGH);
-    led_chirp_red = false;
-  }else{
-    tr = manage_led(BOARD_RGB_RED, &led_red, tr);
+  // Go through all of the LEDs
+  for (int i = 0; i < 4; i++) {
+    // See if the led has been updated by the user
+    if (led_updated[i]) {
+      // If so, clear the flag
+      led_updated[i] = false;
+
+      // Set its time counter to 0
+      tlist[led] = 0;
+    }
+
+    // Manage this led
+    manage_led((Led) i);
   }
 
-  if(led_chirp_green == true){
-    digitalWrite(BOARD_RGB_GREEN, HIGH);
-    led_chirp_green = false;
-  }else{
-    tg = manage_led(BOARD_RGB_GREEN, &led_green, tg);
-  }
-
-  if(led_chirp_blue == true){
-    digitalWrite(BOARD_RGB_BLUE, HIGH);
-    led_chirp_blue = false;
-  }else{
-    tb = manage_led(BOARD_RGB_BLUE, &led_blue, tb);
-  }
-
-  if(led_chirp_aux == true){
-    digitalWrite(LED_PIN, HIGH);
-    led_chirp_aux = false;
-  }else{
-    taux = manage_led(LED_PIN, &led_aux, taux);
-  }
+  // if(led_chirp_red == true){
+  //   digitalWrite(BOARD_RGB_RED, HIGH);
+  //   led_chirp_red = false;
+  // }else{
+  //   tr = manage_led(BOARD_RGB_RED, &led_red, tr);
+  // }
+  //
+  // if(led_chirp_green == true){
+  //   digitalWrite(BOARD_RGB_GREEN, HIGH);
+  //   led_chirp_green = false;
+  // }else{
+  //   tg = manage_led(BOARD_RGB_GREEN, &led_green, tg);
+  // }
+  //
+  // if(led_chirp_blue == true){
+  //   digitalWrite(BOARD_RGB_BLUE, HIGH);
+  //   led_chirp_blue = false;
+  // }else{
+  //   tb = manage_led(BOARD_RGB_BLUE, &led_blue, tb);
+  // }
+  //
+  // if(led_chirp_aux == true){
+  //   digitalWrite(LED_PIN, HIGH);
+  //   led_chirp_aux = false;
+  // }else{
+  //   taux = manage_led(LED_PIN, &led_aux, taux);
+  // }
 }
 
 float led_val;
-uint16_t manage_led(int pin, Led_Mode * mode, uint16_t t) {
-  switch(*mode){
+void manage_led(Led led) {
+  uint8_t pin = led_pin_list[led];
+  Led_Mode mode = led_modes[led];
+  uint16_t t = tlist[led];
+
+  switch(mode){
     case MODE_OFF:
       digitalWrite(pin, LOW);
-      // *mode = MODE_NULL;
-      return 0;
+      led_modes[led] = MODE_NULL;
+      break;
     case MODE_ON:
       digitalWrite(pin, HIGH);
-      // *mode = MODE_NULL;
-      return 0;
+      led_modes[led] = MODE_NULL;
+      break;
+    case MODE_CHIRP:
+      digitalWrite(pin, HIGH);
+      led_modes[led] = MODE_OFF;
+      break;
     case MODE_BLINK:
-      if(t < 40){
+      if(t == 40){
         digitalWrite(pin, HIGH);
-      }else if(t < 80){
+      }else if(t == 80){
         digitalWrite(pin, LOW);
-      }else{
-        t = 0;
+      }else if(t > 80){
+        tlist[led] = 0;
       }
-      t++;
-      return t;
+      tlist[led]++;
+      break;
     case MODE_BLINK_DIM:
-      if(t < 40){
+      if(t == 40){
         analogWrite(pin, 100);
-      }else if(t < 80){
+      }else if(t == 80){
         analogWrite(pin, 0);
-      }else{
-        t = 0;
+      }else if (t > 80){
+        tlist[led] = 0;
       }
-      t++;
-      return t;
+      tlist[led]++;
+      break;
     case MODE_RAMP:
       if(t < 5){
         led_val = t*51;
@@ -567,11 +612,12 @@ uint16_t manage_led(int pin, Led_Mode * mode, uint16_t t) {
         led_val = 0;
       }
       if(t > 100){
-        t = 0;
+        tlist[led] = 0;
       }
       analogWrite(pin, (int)led_val);
-      t++;
-      return t;
+
+      tlist[led]++;
+      break;
     case MODE_DOUBLE_RAMP:
       if(t < 5){
         led_val = t*51;
@@ -585,11 +631,11 @@ uint16_t manage_led(int pin, Led_Mode * mode, uint16_t t) {
         led_val = 0;
       }
       if(t > 150){
-        t = 0;
+        tlist[led] = 0;
       }
       analogWrite(pin, (int)led_val);
-      t++;
-      return t;
+      tlist[led]++;
+      break;
   }
 }
 

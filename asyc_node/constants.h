@@ -92,13 +92,42 @@ enum Msg_Type {
 
 //   MESSAGE FORMATS
 enum Led_Mode {
-  MODE_NULL = 0,
-  MODE_OFF = 1,
-  MODE_ON = 2,
-  MODE_BLINK = 3,
-  MODE_RAMP = 4,
+  MODE_NULL        = 0,
+  MODE_OFF         = 1,
+  MODE_ON          = 2,
+  MODE_BLINK       = 3,
+  MODE_RAMP        = 4,
   MODE_DOUBLE_RAMP = 5,
-  MODE_BLINK_DIM = 6
+  MODE_BLINK_DIM   = 6,
+  MODE_CHIRP       = 7
+};
+
+enum Led {
+  LED_AUX   = 0,
+  LED_RED   = 1,
+  LED_GREEN = 2,
+  LED_BLUE  = 3
+};
+
+Led_Mode led_modes[] = {
+  MODE_OFF,
+  MODE_OFF,
+  MODE_OFF,
+  MODE_OFF
+};
+
+boolean led_updated[] = {
+  false,
+  false,
+  false,
+  false
+};
+
+uint8_t led_pin_list[] = {
+  LED_PIN,
+  BOARD_RGB_RED,
+  BOARD_RGB_GREEN,
+  BOARD_RGB_BLUE
 };
 
 char *MsgTypes[] = {
