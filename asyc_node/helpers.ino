@@ -26,12 +26,21 @@ int freeMemory() {
 
 // Print a message struct to the console
 void printMessage(Message msg) {
-  Serial.print('['); Serial.print(msg.valid); Serial.print("] ");
-  Serial.print("From ("); Serial.print(msg.from);
-  Serial.print(") Seq ("); Serial.print(msg.seq);
-  Serial.print(") Type ("); Serial.print(MsgTypes[msg.type]);
-  Serial.print(") Data {"); DW1000.printPrettyHex(msg.data, msg.len, false);
-  Serial.print("} Memory: "); Serial.println(freeMemory());
+  inc();
+  pcln("Message Contents");
+  sprintf(medium_buf, "| → %-8s%d", "Valid: ", msg.valid); pcln(medium_buf);
+  sprintf(medium_buf, "| → %-8s%d", "From: ", msg.from); pcln(medium_buf);
+  sprintf(medium_buf, "| → %-8s%d", "Seq: ", msg.seq); pcln(medium_buf);
+  sprintf(medium_buf, "| → %-8s%s", "Type: ", MsgTypes[msg.type]); pcln(medium_buf);
+  sprintf(medium_buf, "| → %-8s0x%.*X", "Data: ", msg.len, msg.data); pcln(medium_buf);
+  sprintf(medium_buf, "| → %-8s%d", "Mem: ", freeMemory()); pcln(medium_buf);
+  dec();
+  // Serial.print('['); Serial.print(msg.valid); Serial.print("] ");
+  // Serial.print("From ("); Serial.print(msg.from);
+  // Serial.print(") Seq ("); Serial.print(msg.seq);
+  // Serial.print(") Type ("); Serial.print(MsgTypes[msg.type]);
+  // Serial.print(") Data {"); DW1000.printPrettyHex(msg.data, msg.len, false);
+  // Serial.print("} Memory: "); Serial.println(freeMemory());
 }
 
 // Get a message from the DW1000 and return its message format
@@ -128,26 +137,62 @@ uint32_t getRangeRecDelay(uint8_t nodeNum, Settings s) {
 }
 
 void printSettings(Settings s) {
-  Serial.print("Settings [n:"); Serial.print(s.n);
-  Serial.print(", t_rx:"); Serial.print(s.t_rx);
-  Serial.print(", t_b:"); Serial.print(s.t_b);
-  Serial.print(", t_r:"); Serial.print(s.t_r);
-  Serial.print(", t_cl:"); Serial.print(s.t_cl);
-  Serial.print(", t_br:"); Serial.print(s.t_br);
-  Serial.print(", t_fr:"); Serial.print(s.t_fr);
-  Serial.print(", t_bc:"); Serial.print(s.t_bc);
-  Serial.print(", t_fc:"); Serial.print(s.t_fc);
-  Serial.print(", t_rn:"); Serial.print(s.t_rn);
-  Serial.print(", t_s:"); Serial.print(s.t_s);
-  Serial.print(", t_fs:"); Serial.print(s.t_fs);
-  Serial.print(", t_c:"); Serial.print(s.t_c);
-  Serial.print(", n_com:"); Serial.print(s.n_com);
-  Serial.print(", bits_c:"); Serial.print(s.bits_c);
-  Serial.println("]");
+  section("System Settings", C_ORANGE);
+  sprintf(medium_buf, "%-8s%d", "n:", s.n); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "t_rx:", s.t_rx); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "t_s:", s.t_s); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "t_fs:", s.t_fs); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "t_c:", s.t_c); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "n_com:", s.n_com); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "t_b:", s.t_b); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "t_r:", s.t_r); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "t_cl:", s.t_cl); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "t_br:", s.t_br); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "t_fr:", s.t_fr); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "t_bc:", s.t_bc); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "t_fc:", s.t_fc); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "t_rn:", s.t_rn); pcln(medium_buf, C_RED);
+  sprintf(medium_buf, "%-8s%d", "bits_c:", s.bits_c); pcln(medium_buf, C_RED);
+  endSection();
+  pcln("");
+
+  // sprintf(small_buf, "n: %d", s.n); scln(small_buf);
+  // sprintf(small_buf, "t_rx: %d", s.t_rx); scln(small_buf);
+  // sprintf(small_buf, "t_b: %d", s.t_b); scln(small_buf);
+  // sprintf(small_buf, "t_r: %d", s.t_r); scln(small_buf);
+  // sprintf(small_buf, "t_cl: %d", s.t_cl); scln(small_buf);
+  // sprintf(small_buf, "t_br: %d", s.t_br); scln(small_buf);
+  // sprintf(small_buf, "t_fr: %d", s.t_fr); scln(small_buf);
+  // sprintf(small_buf, "t_bc: %d", s.t_bc); scln(small_buf);
+  // sprintf(small_buf, "t_fc: %d", s.t_fc); scln(small_buf);
+  // sprintf(small_buf, "t_rn: %d", s.t_rn); scln(small_buf);
+  // sprintf(small_buf, "t_s: %d", s.t_s); scln(small_buf);
+  // sprintf(small_buf, "t_fs: %d", s.t_fs); scln(small_buf);
+  // sprintf(small_buf, "t_c: %d", s.t_c); scln(small_buf);
+  // sprintf(small_buf, "n_com: %d", s.n_com); scln(small_buf);
+  // sprintf(small_buf, "bits_c: %d", s.bits_c); scln(small_buf);
+
+  //
+  // Serial.print("Settings [n:"); Serial.print(s.n);
+  // Serial.print(", t_rx:"); Serial.print(s.t_rx);
+  // Serial.print(", t_b:"); Serial.print(s.t_b);
+  // Serial.print(", t_r:"); Serial.print(s.t_r);
+  // Serial.print(", t_cl:"); Serial.print(s.t_cl);
+  // Serial.print(", t_br:"); Serial.print(s.t_br);
+  // Serial.print(", t_fr:"); Serial.print(s.t_fr);
+  // Serial.print(", t_bc:"); Serial.print(s.t_bc);
+  // Serial.print(", t_fc:"); Serial.print(s.t_fc);
+  // Serial.print(", t_rn:"); Serial.print(s.t_rn);
+  // Serial.print(", t_s:"); Serial.print(s.t_s);
+  // Serial.print(", t_fs:"); Serial.print(s.t_fs);
+  // Serial.print(", t_c:"); Serial.print(s.t_c);
+  // Serial.print(", n_com:"); Serial.print(s.n_com);
+  // Serial.print(", bits_c:"); Serial.print(s.bits_c);
+  // Serial.println("]");
 }
 
 float runningTotal;
-float computeRange(DW1000Time& rec, uint8_t fromId) {
+double computeRange(DW1000Time& rec, uint8_t fromId) {
 
 
   // The total time between our poll message being sent and the reply being
@@ -171,7 +216,7 @@ float computeRange(DW1000Time& rec, uint8_t fromId) {
   // Serial.print(", Received:"); Serial.print(rec.getAsMicroSeconds());
   // Serial.print(", Dist:"); Serial.println(distance);
 
-  return distance;
+  return (double)distance;
 }
 
 // TODO Finish adjust clock
@@ -399,6 +444,7 @@ Frame getFrameFromSeq(uint8_t seq, Settings s) {
     return FRAME_SLEEP;
 }
 
+
 void stopTimers() {
   M0Timer.stop(_BLOCK_TIMER);
   M0Timer.stop(_FRAME_TIMER);
@@ -418,6 +464,7 @@ long getDelayMicros(uint32_t cycleDelay, uint32_t now) {
 // should be the number of micros between the start of the cycle and when the
 // timer should fire. The offset should be the current time
 boolean setFrameTimer(uint32_t cycleDelay, uint32_t now, boolean wrapTime = false) {
+  // inc();
   // Set the delay based on the cycle start time, the offset (now time), and
   // the callback delay (referenced to the cycle start time)
   long delay = getDelayMicros(cycleDelay, now);
@@ -458,10 +505,12 @@ boolean setFrameTimer(uint32_t cycleDelay, uint32_t now, boolean wrapTime = fals
   M0Timer.start(delay, _FRAME_TIMER, now);
   frameTimerSet = true;
 
-  Serial.print("Frame Timer set: "); Serial.print((long) delay);
-  Serial.print(", "); Serial.print(cycleDelay);
-  Serial.print(", "); Serial.println(now);
 
+  sprintf(medium_buf, "> Frame Timer set: %ld", delay + now); pcln(medium_buf);
+  sprintf(medium_buf, "| → Delay: %lu", delay); pcln(medium_buf);
+  sprintf(medium_buf, "| → Now:   %ld", now); pcln(medium_buf);
+
+  // dec();
   return true;
 }
 
@@ -489,9 +538,9 @@ boolean setBlockTimer(uint32_t cycleDelay, uint32_t now) {
   M0Timer.start(delay, _BLOCK_TIMER, micros());
   blockTimerSet = true;
 
-  Serial.print("Block Timer set: "); Serial.print((long) delay);
-  Serial.print(", "); Serial.print(cycleDelay);
-  Serial.print(", "); Serial.println(now);
+  sprintf(medium_buf, "> Block Timer set: %ld", delay + now); pcln(medium_buf);
+  sprintf(medium_buf, "| → Delay: %lu", delay); pcln(medium_buf);
+  sprintf(medium_buf, "| → Now:   %ld", now); pcln(medium_buf);
 
   return true;
 }
@@ -504,16 +553,26 @@ boolean updateTimers(struct State * state, state_fn * frameState, state_fn * blo
   if (!prompt) {
     M0Timer.stop(_BLOCK_TIMER); // TODO Not Needed?
     state->next = frameState;
+    pcln("> Frame Timer late!", C_RED);
     return false;
   }
 
-  // Set up the block timer to fire when it is time for us to move to our
-  // ranging block. If that is too soon, then move to blockState and return
-  // false to alert the user
-  prompt = setBlockTimer(blockDelay, now);
-  if (!prompt) {
-    state->next = blockState;
-    return false;
+  // Check to see that we should set the timer
+  if(blockDelay > 0){
+    // Set up the block timer to fire when it is time for us to move to our
+    // ranging block. If that is too soon, then move to blockState and return
+    // false to alert the user
+    prompt = setBlockTimer(blockDelay, now);
+    if (!prompt) {
+      state->next = blockState;
+      pcln("> Block Timer late!", C_RED);
+      return false;
+    }
+  }else{
+    // Reset the timer
+    M0Timer.stop(_BLOCK_TIMER);
+    blockTimerSet = false;
+    pcln("> Disabled Block Timer", C_BLUE);
   }
 
   // If both timers were set correctly, return true
@@ -526,13 +585,13 @@ boolean updateTimers(struct State * state, state_fn * frameState, state_fn * blo
 boolean checkTimers(struct State * state, state_fn * frameState, state_fn * blockState) {
   // Frame Timer
   if (M0Timer.getFired(_FRAME_TIMER)) {
-    Serial.print("Frame Timer Fired: "); Serial.println(micros());
+    sprintf(medium_buf, "> Frame Timer Fired: %lu", micros()); pcln(medium_buf);
     state->next = frameState;
     return true;
   }
 
   if (M0Timer.getFired(_BLOCK_TIMER)) {
-    Serial.print("Block Timer Fired: "); Serial.println(micros());
+    sprintf(medium_buf, "> Block Timer Fired: %lu", micros()); pcln(medium_buf);
     state->next = blockState;
     return true;
   }

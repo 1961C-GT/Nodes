@@ -1,8 +1,29 @@
-#define DEBUG
+#define DEBUG 50
+#define DEBUG0
+#define DEBUG1
+#define DEBUG2
+#define DEBUG3
+#define DEBUG4
+#define DEBUG5
+
 #define LED_PIN 13
 
 #define LEN_DATA 9
 #define LEN_MAC 3
+
+#define TINY_BUFFER_LEN 12
+#define SMALL_BUFFER_LEN 80
+#define MEDIUM_BUFFER_LEN 120
+#define LARGE_BUFFER_LEN 255
+
+char tiny_buf[TINY_BUFFER_LEN];
+char small_buf[SMALL_BUFFER_LEN];
+char medium_buf[MEDIUM_BUFFER_LEN];
+char large_buf[LARGE_BUFFER_LEN];
+
+#define D_BLINK_C_CYAN D_BLINK C_CYAN
+
+#define BG_RED_C_WHITE BG_RED C_WHITE
 
 // PIN DEFS
 #define PIN_RST_BREAD 9
@@ -12,6 +33,10 @@
 #define PIN_RST_NODE 8
 #define PIN_IRQ_NODE 2
 #define PIN_SS_NODE 10
+
+#define BOARD_RGB_RED 11
+#define BOARD_RGB_GREEN 7
+#define BOARD_RGB_BLUE 5
 
 // Coef for calculating the battery voltage from the BATT pin.
 // 3.31 / 1024.0 * 2 = 0.00646484375
@@ -65,6 +90,17 @@ enum Msg_Type {
   SETTINGS = 6
 };
 
+//   MESSAGE FORMATS
+enum Led_Mode {
+  MODE_NULL = 0,
+  MODE_OFF = 1,
+  MODE_ON = 2,
+  MODE_BLINK = 3,
+  MODE_RAMP = 4,
+  MODE_DOUBLE_RAMP = 5,
+  MODE_BLINK_DIM = 6
+};
+
 char *MsgTypes[] = {
   "ANN MSG",
   "NUL MSG",
@@ -111,6 +147,7 @@ struct Message {
 // Settings Structure
 // all times in us
 struct Settings {
+
 
   // --- Given Settings
   const byte * mode;         // MODE_LONGDATA_RANGE_LOWPOWER

@@ -1,18 +1,20 @@
 // IMPORTS
-#include <SPI.h>
+// #include <SPI.h>
 #include <DW1000.h>
 #include <M0Timer.h>
 #include "constants.h"
 // END IMPORTS
 
 // ========= Node IDs ========== //
-#define LEN_NODES_LIST 2
+#define LEN_NODES_LIST 4
 constexpr uint16_t nodeList[] = {
-  0x726C, // RED - Base Station
+  0x2243, // BASE 1
   0x6606,  // NODE 1
+  0x5DCB, // BASE 2
+  0xDC19, // NODE 3
+  0x726C, // RED
   0x71E9, // BLUE
-  0xFDA0,  // GREEN
-
+  0xFDA0  // GREEN
 };
 // ========= Node IDs ========== //
 
@@ -26,6 +28,17 @@ Settings settings;
 // State control
 State state;
 
+// LED Vars
+Led_Mode led_red = MODE_OFF;
+Led_Mode led_green = MODE_OFF;
+Led_Mode led_blue = MODE_OFF;
+Led_Mode led_aux = MODE_OFF;
+boolean led_rst;
+boolean led_chirp_red;
+boolean led_chirp_green;
+boolean led_chirp_blue;
+boolean led_chirp_aux;
+
 // RX and TX Callback Functions
 volatile uint32_t rxTimeM0;
 volatile uint32_t txTimeM0;
@@ -33,8 +46,8 @@ DW1000Time rxTimeDW;
 DW1000Time txTimeDW;
 volatile boolean txFlag = false;
 volatile boolean rxFlag = false;
-void rxHandle() { rxTimeM0 = DW1000.getRxTime(); rxFlag = true; /*Serial.print('r'); Serial.println(rxTimeM0);*/ }
-void txHandle() { txTimeM0 = DW1000.getTxTime(); txFlag = true; /*Serial.print('t'); Serial.println(txTimeM0);*/ }
+void rxHandle() { rxTimeM0 = DW1000.getRxTime(); rxFlag = true; }
+void txHandle() { txTimeM0 = DW1000.getTxTime(); txFlag = true; /*Serial.write((uint8_t)116); Serial.println(txTimeM0);*/ }
 boolean checkRx() { if (rxFlag) { DW1000.getReceiveTimestamp(rxTimeDW); rxFlag = false; return true; } return false; }
 boolean checkTx() { if (txFlag) { DW1000.getTransmitTimestamp(txTimeDW); txFlag = false; return true; } return false; }
 
@@ -83,6 +96,11 @@ void setup() {
   rxTimeout = false;
   numClockErrors = 0;
 
+  // LED Timer
+  M0Timer.setup(_LED_TIMER);
+  M0Timer.attachTC5Handler(t_leds);
+  M0Timer.startms(10, _LED_TIMER);
+
   // emptyMessage = {
   //   .from    = 0,
   //   .type    = 0,
@@ -100,7 +118,7 @@ void setup() {
     .t_rx    = 4000,  // Buffer time for changing rx/tx mode // 1000
     .t_b     = 1000,  // Buffer time between all blocks // 1000
 
-    .t_r     = 4000,  // Time between range responses - longer than range_resp // 3000
+    .t_r     = 10000,  // Time between range responses - longer than range_resp // 4000
                      //  message length (~3ms)
     .n_com   = 3,     // Number of com frames per cycle
     .bits_c  = 16,    // Number of bits allowed in a com message
@@ -117,11 +135,47 @@ void setup() {
   transmitAuthorization = false;
 
   pinMode(LED_PIN, OUTPUT);
+  pinMode(BOARD_RGB_RED, OUTPUT);
+  pinMode(BOARD_RGB_GREEN, OUTPUT);
+  pinMode(BOARD_RGB_BLUE, OUTPUT);
+
+  // digitalWrite(BOARD_RGB_RED, HIGH);
+  // digitalWrite(BOARD_RGB_GREEN, HIGH);
+  // digitalWrite(BOARD_RGB_BLUE, HIGH);
 
   // Start the serial interface
-  Serial.begin(115200);
+  Serial.begin(256000);
+
+  // float r, g, b, t;
+  // r = 0; g = 0; b = 0; t = 0;
+
+  // led_red = MODE_RAMP;
   while(!Serial);
-  Serial.println(F("### ASYC Node ###"));
+  // delay(1000);
+  // led_red = MODE_OFF;
+  // led_aux = MODE_BLINK;
+
+
+  header("ASYC NODE", C_BLACK, BG_YELLOW);
+  inc();
+  // header("SLEEP FRAME", C_BLACK, BG_GREEN);
+  // header("RANGE FRAME", C_WHITE, BG_RED);
+
+
+
+  // pcln("Program Boot", BG_RED_C_WHITE);
+  //
+  // inc(); pind(); p("This is some "); pc("CoOl StUfF", C_GREEN); pln(" Same here");
+  //
+  // pind(); sprintf(small_buf, "This is some %sCoOl StUfF%s Same here", C_GREEN, D_CLEAR); Serial.println(small_buf);
+  //
+  // rst();
+  //
+  // section("Boot Information");
+  // pcln("Loading Data", C_RED);
+  // pcln("  -> 0xAbnfn33adas", C_RED);
+  // pcln("Being Awesome", C_ORANGE);
+  // endSection("SUCCESS", C_GREEN);
 
   // #ifdef DEBUG
   // if (!isBase)
@@ -153,10 +207,14 @@ void setup() {
     // program
     if (nodeNumber == 255) {
       while(!Serial);
-      Serial.print("Error: Node ID Not in List: "); Serial.println(ownAddress, HEX);
+      sprintf(large_buf, "Error:%s Node ID Not in List: %04X", D_CLEAR, ownAddress);
+      section(large_buf, C_RED);
       for (uint8_t i = 0; i < LEN_NODES_LIST; i++) {
-        Serial.print(" -- "); Serial.println(nodeList[i], HEX);
+        sprintf(tiny_buf, "%04X", nodeList[i]);
+        pcln(tiny_buf);
       }
+
+      endSection("SYSTEM FAILURE", C_RED);
       // Kill The Program
       for (;;)
         delay(1000);
@@ -166,11 +224,11 @@ void setup() {
 
   // INIT DW1000
   #ifdef MNSLAC_NODE_M0
-    Serial.println("MNSLAC Node Hardware detected");
+    pcln("MNSLAC Node Hardware detected");
     DW1000.begin(PIN_IRQ_NODE, PIN_RST_NODE);
     DW1000.select(PIN_SS_NODE);
   #else
-    Serial.println("Non MNSLAC Node Hardware detected");
+    pcln("Non MNSLAC Node Hardware detected", C_ORANGE);
     DW1000.begin(PIN_IRQ_BREAD, PIN_RST_BREAD);
     DW1000.select(PIN_SS_BREAD);
   #endif
@@ -238,16 +296,14 @@ void setup() {
   if (isBase)
     while(!Serial);
 
-
-  Serial.println(F("Committed configuration ..."));
-
   // Print details about our node number
-  Serial.print("Own Address:"); Serial.print(ownAddress, HEX);
-  Serial.print(" -- Node #"); Serial.print(nodeNumber);
-  if (isBase)
-    Serial.println(" -- IS BASE");
-  else
-    Serial.println();
+  section("System Boot");
+  sprintf(small_buf, "Own Address: %04X", ownAddress); pcln(small_buf);
+  sprintf(small_buf, " -> Node #%d", nodeNumber); pcln(small_buf);
+  if (isBase) {
+    sprintf(small_buf, " -> IS BASE", nodeNumber); pcln(small_buf, C_GREEN);
+  }
+  pcln("");
 
   // Attach DW1000 Handlers
   DW1000.attachSentHandler(txHandle);
@@ -260,13 +316,15 @@ void setup() {
   // Print details about our config
   char msg[128];
   DW1000.getPrintableDeviceIdentifier(msg);
-  Serial.print("Device ID: "); Serial.println(msg);
+  sprintf(medium_buf, "Device ID: %s", msg); pcln(medium_buf);
   DW1000.getPrintableExtendedUniqueIdentifier(msg);
-  Serial.print("Unique ID: "); Serial.println(msg);
+  sprintf(medium_buf, "Unique ID: %s", msg); pcln(medium_buf);
   DW1000.getPrintableNetworkIdAndShortAddress(msg);
-  Serial.print("Network ID & Device Address: "); Serial.println(msg);
+  sprintf(medium_buf, "Network ID & Device Address: %s", msg); pcln(medium_buf);
   DW1000.getPrintableDeviceMode(msg);
-  Serial.print("Device mode: "); Serial.println(msg);
+  sprintf(medium_buf, "Device Mode: %s", msg); pcln(medium_buf);
+
+  endSection("Boot Success\n\r", C_GREEN);
 
   printSettings(settings);
 
@@ -280,9 +338,6 @@ void setup() {
   led = false;
 
   // Configure our timers
-  // LED Timer
-  M0Timer.setup(_LED_TIMER);
-  M0Timer.attachTC5Handler(t_blink);
 
   // Block Timer
   M0Timer.setup(_BLOCK_TIMER);
@@ -322,11 +377,14 @@ void setup() {
     transmitAuthorization = true;
   }
 
-  Serial.println("\033[0;35mThis is a test!");
+  //Serial.println("\033[0;35mThis is a test!");
 
   // else {
   //   state = { ra_init };
   // }
+
+  // Reset indentation
+  rst();
 }
 
 
@@ -384,20 +442,20 @@ uint16_t getShortAddress() {
   return val4*256+val3;
 }
 
-void blinkLoop() {
-  M0Timer.startms(100, _LED_TIMER);
-}
-
-void blinkInit() {
-  // M0Timer.start(10, M0Timer.T5);
-  M0Timer.stop(_LED_TIMER);
-  blink = false;
-  digitalWrite(LED_PIN, HIGH);
-}
-
-void blinkTx() {
-  M0Timer.startms(25, _LED_TIMER);
-}
+// void blinkLoop() {
+//   M0Timer.startms(100, _LED_TIMER);
+// }
+//
+// void blinkInit() {
+//   // M0Timer.start(10, M0Timer.T5);
+//   M0Timer.stop(_LED_TIMER);
+//   blink = false;
+//   digitalWrite(LED_PIN, HIGH);
+// }
+//
+// void blinkTx() {
+//   M0Timer.startms(25, _LED_TIMER);
+// }
 
 void receiver() {
   	DW1000.newReceive();
@@ -427,9 +485,141 @@ void clkErrHandler() {
   clkErr = true;
 }
 
-void t_blink(uint8_t t) {
-  blink = true;
+uint16_t tr = 0;
+uint16_t tg = 0;
+uint16_t tb = 0;
+uint16_t taux = 0;
+
+void t_leds(uint8_t t) {
+  if(led_rst){
+    tr = 0;
+    tg = 0;
+    tb = 0;
+    taux = 0;
+  }
+
+  if(led_chirp_red == true){
+    digitalWrite(BOARD_RGB_RED, HIGH);
+    led_chirp_red = false;
+  }else{
+    tr = manage_led(BOARD_RGB_RED, &led_red, tr);
+  }
+
+  if(led_chirp_green == true){
+    digitalWrite(BOARD_RGB_GREEN, HIGH);
+    led_chirp_green = false;
+  }else{
+    tg = manage_led(BOARD_RGB_GREEN, &led_green, tg);
+  }
+
+  if(led_chirp_blue == true){
+    digitalWrite(BOARD_RGB_BLUE, HIGH);
+    led_chirp_blue = false;
+  }else{
+    tb = manage_led(BOARD_RGB_BLUE, &led_blue, tb);
+  }
+
+  if(led_chirp_aux == true){
+    digitalWrite(LED_PIN, HIGH);
+    led_chirp_aux = false;
+  }else{
+    taux = manage_led(LED_PIN, &led_aux, taux);
+  }
 }
+
+float led_val;
+uint16_t manage_led(int pin, Led_Mode * mode, uint16_t t) {
+  switch(*mode){
+    case MODE_OFF:
+      digitalWrite(pin, LOW);
+      // *mode = MODE_NULL;
+      return 0;
+    case MODE_ON:
+      digitalWrite(pin, HIGH);
+      // *mode = MODE_NULL;
+      return 0;
+    case MODE_BLINK:
+      if(t < 40){
+        digitalWrite(pin, HIGH);
+      }else if(t < 80){
+        digitalWrite(pin, LOW);
+      }else{
+        t = 0;
+      }
+      t++;
+      return t;
+    case MODE_BLINK_DIM:
+      if(t < 40){
+        analogWrite(pin, 100);
+      }else if(t < 80){
+        analogWrite(pin, 0);
+      }else{
+        t = 0;
+      }
+      t++;
+      return t;
+    case MODE_RAMP:
+      if(t < 5){
+        led_val = t*51;
+      }else if(t <= 40){
+        led_val = 255-(t-5)*7.285714286;
+      }else{
+        led_val = 0;
+      }
+      if(t > 100){
+        t = 0;
+      }
+      analogWrite(pin, (int)led_val);
+      t++;
+      return t;
+    case MODE_DOUBLE_RAMP:
+      if(t < 5){
+        led_val = t*51;
+      }else if(t <= 40){
+        led_val = 255-(t-5)*7.285714286;
+      }else if(t < 45){
+        led_val = t*51;
+      }else if(t <= 80){
+        led_val = 255-(t-45)*7.285714286;
+      }else{
+        led_val = 0;
+      }
+      if(t > 150){
+        t = 0;
+      }
+      analogWrite(pin, (int)led_val);
+      t++;
+      return t;
+  }
+}
+
+/*
+float r, g, b, t;
+r = 0; g = 0; b = 0; t = 0;
+
+while(!Serial) {
+  t ++;
+  if(t < 50){
+    r = t*5.1;
+  }else if(t <= 400){
+    r = 255-(t-50)*0.7285714286;
+  }else{
+    r = 0;
+    g = 0;
+    b = 0;
+  }
+
+  if(t > 600){
+    t = 0;
+  }
+
+  analogWrite(BOARD_RGB_RED, (int)r);
+  // analogWrite(BOARD_RGB_GREEN, g);
+  // analogWrite(BOARD_RGB_BLUE, b);
+
+  // delay(1);
+}*/
+
 
 // Main Loop
 void loop() {
