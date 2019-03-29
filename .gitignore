@@ -51,3 +51,9 @@ Module.symvers
 Mkfile.old
 dkms.conf
 *.bin
+Icon\r
+asyc_node/.sync
+~$*
+upload-k.sh
+toggle.scpt
+Icon\r

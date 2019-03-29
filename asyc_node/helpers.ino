@@ -220,16 +220,16 @@ double computeRange(DW1000Time& rec, uint8_t fromId) {
 }
 
 // TODO Finish adjust clock
-boolean adjustClock(Message msg, uint32_t m0rx, float dwrx, boolean force = false) {
+boolean adjustClock(Message msg, uint32_t m0rx, float dwrx, boolean confirmCycle = true) {
 
   // Figure out what frame we are in
   Frame curFrame = getFrameFromSeq(msg.seq, settings);
   // Figure out if this is the start of this block
   boolean blockStart = isBlockStart(curFrame, msg.seq, settings);
 
-  // If this message is the start of a block OR the user has set force to true,
+  // If this message is the start of a block,
   // the we adjust our clocks
-  if (blockStart || force) {
+  if (blockStart) {
 
     // Reset our DWOffset based on the message we got. Usage of this offset value
     // us explained at its def.
@@ -245,7 +245,8 @@ boolean adjustClock(Message msg, uint32_t m0rx, float dwrx, boolean force = fals
     cycleStart = m0rx - curCycleTime;
 
     // Because we have just confirmed our cycle, set cycleValid to true
-    cycleValid = 5;
+    if (confirmCycle)
+      cycleValid = 5;
 
     // Return true to denote a clock adjustment
     return true;

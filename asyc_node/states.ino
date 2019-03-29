@@ -514,9 +514,9 @@ void rb_rec(struct State * state)
 
   // Reset our block timer based on the time at which our transmission sent
   // (which is the NEW block sync)
-  int tmp = cycleValid;
-  boolean adjusted = adjustClock(txMessage, txTimeM0, txTimeDW.getAsMicroSeconds());
-  cycleValid = tmp;
+  // int tmp = cycleValid;
+  boolean adjusted = adjustClock(txMessage, txTimeM0, txTimeDW.getAsMicroSeconds(), false);
+  // cycleValid = tmp;
 
   if (!adjusted) {
     pcln("Clock Not Adjusted on TX", C_RED);
@@ -619,7 +619,7 @@ void rb_decode(struct State * state)
           DW1000.getReceiveTimestamp(rec);
           double dist = computeRange(rec, rxMessage.from);
 
-          led_chirp_aux = true;
+          setLed(LED_AUX, MODE_CHIRP);
 
           pcln("Message Type: Range RESP", C_PURPLE);
           sprintf(medium_buf, "| → From: %d", rxMessage.from); pcln(medium_buf, C_PURPLE);
