@@ -31,13 +31,25 @@ void sleep(struct State * state)
   // Set the default next state
   state->next = sleep_loop;
 
+  if (cycleValid <= 0 && isBase) {
+    cycleStart = micros();
+    cycleValid = 10;
+  }
+
   // If our cycle is valid here at the start of sleep, then go ahead and set our
   // sleep timeout. Otherwise we will have to wait until we can validate it
   // later.
-  if (cycleValid > 0 || isBase) {
+  if (cycleValid > 0) {
     sprintf(medium_buf, "Cycle Valid: %d", cycleValid); pcln(medium_buf);
-    if (isBase)
-      cycleStart = micros();
+
+    sprintf(medium_buf, "Old Cycle Start: %d", cycleStart); pcln(medium_buf);
+
+    // Step the cycle start forward
+    cycleStart += settings.t_c;
+
+    sprintf(medium_buf, "New Cycle Start: %d", cycleStart); pcln(medium_buf);
+
+    sprintf(medium_buf, "Now: %d", micros()); pcln(medium_buf);
 
     setFrameTimer(settings.t_fs, cycleStart, true);
   }
@@ -68,18 +80,18 @@ void sleep_loop(struct State * state)
   // See if it is time to leave the sleep frame. The block state is set to the
   // sleep frame so that if it is set (incorrecly), we will not leave sleep mode
   if (checkTimers(state, range_frame_init, sleep)) {
-    cycleStart = micros() - settings.t_fs;
+    // cycleStart = micros() - settings.t_fs;
     pcln("Timer Triggered", C_GREEN);
     dec();
     return;
   }
 
-  // If we do not have a frame timer set but we DO have a valid cycle time, then
-  // we should go ahead and set our frame timer
-  if (!frameTimerSet && cycleValid > 0) {
-    pcln("Cycle Now Valid. Setting Frame Timer", C_GREEN);
-    setFrameTimer(settings.t_fs, micros(), true);
-  }
+  // // If we do not have a frame timer set but we DO have a valid cycle time, then
+  // // we should go ahead and set our frame timer
+  // if (!frameTimerSet && cycleValid > 0) {
+  //   pcln("Cycle Now Valid. Setting Frame Timer", C_GREEN);
+  //   setFrameTimer(settings.t_fs, cycleStart, true);
+  // }
 }
 void sleep_decode(struct State * state)
 {
@@ -107,7 +119,7 @@ void sleep_decode(struct State * state)
     // callback
     if (adjusted) {
       pcln("Adjusted clock. Setting new frame timer", C_BLUE);
-      setFrameTimer(settings.t_fs, micros(), true);
+      setFrameTimer(settings.t_fs, cycleStart, true);
     }
   }
   endSection("End Decode");
@@ -259,6 +271,7 @@ void ra_decode(struct State * state)
         pcln("Got Range Request", C_GREEN);
         break;
       default:
+        changeState = true;
         pcln("Bad Message Type", C_RED);
         // state->next = getState(rxMessage);
         break;
@@ -292,6 +305,9 @@ void ra_decode(struct State * state)
         changeState = true;
       }
     }
+  } else {
+    pcln("Malformed Message", C_RED);
+    changeState = true;
   }
   endSection("End Decode");
 
@@ -516,8 +532,8 @@ void rb_rec(struct State * state)
   boolean adjusted = adjustClock(txMessage, txTimeM0, txTimeDW.getAsMicroSeconds(), false);
 
   if (!adjusted) {
-    pcln("Clock Not Adjusted on TX", C_RED);
-    printMessage(txMessage);
+    // pcln("Clock Not Adjusted on TX", C_RED);
+    // printMessage(txMessage);
   } else {
     pcln("Set new Frame and Block Timers", C_BLUE);
     // If we got a new clock adjustment, then we should reset our block timer
@@ -661,6 +677,8 @@ void rb_decode(struct State * state)
         return;
       }
     }
+  } else {
+      pcln("Malformed Message", C_RED);
   }
 
   // // Check our timers. If one of them fires, then our state will be set as

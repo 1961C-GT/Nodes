@@ -8,13 +8,13 @@
 // ========= Node IDs ========== //
 #define LEN_NODES_LIST 4
 constexpr uint16_t nodeList[] = {
-  0x2243, // BASE 1
-  0x6606,  // NODE 1
   0x5DCB, // BASE 2
-  0xDC19, // NODE 3
-  0x726C, // RED
-  0x71E9, // BLUE
-  0xFDA0  // GREEN
+  // 0x6606, // NODE 1
+  // 0xDC19, // NODE 3
+  0xBFAA, // NODE 2
+  0x805C, // NODE 4
+  0x2243, // BASE 1
+  // 0xDEAD  // FILLER
 };
 // ========= Node IDs ========== //
 
@@ -109,7 +109,7 @@ void setup() {
 
     .n       = LEN_NODES_LIST,
     .t_rx    = 4000,  // Buffer time for changing rx/tx mode // 1000
-    .t_b     = 1000,  // Buffer time between all blocks // 1000
+    .t_b     = 10000,  // Buffer time between all blocks // 1000
 
     .t_r     = 10000,  // Time between range responses - longer than range_resp // 4000
                      //  message length (~3ms)
@@ -142,10 +142,10 @@ void setup() {
   // float r, g, b, t;
   // r = 0; g = 0; b = 0; t = 0;
 
-  setLed(LED_RED, MODE_RAMP);
+
+  // setLed(LED_RED, MODE_RAMP);
   while(!Serial);
-  // delay(1000);
-  setLed(LED_RED, MODE_OFF);
+  // setLed(LED_RED, MODE_OFF);
 
 
   header("ASYC NODE", C_BLACK, BG_YELLOW);
@@ -168,11 +168,6 @@ void setup() {
   // pcln("  -> 0xAbnfn33adas", C_RED);
   // pcln("Being Awesome", C_ORANGE);
   // endSection("SUCCESS", C_GREEN);
-
-  // #ifdef DEBUG
-  // if (!isBase)
-  //   while(!Serial);
-  // #endif
 
   // Figure out what node number we are
   // First see if we are the first address in the node list. If we are, then we
@@ -214,16 +209,25 @@ void setup() {
     }
   }
 
-  // INIT DW1000
-  #ifdef MNSLAC_NODE_M0
-    pcln("MNSLAC Node Hardware detected");
-    DW1000.begin(PIN_IRQ_NODE, PIN_RST_NODE);
-    DW1000.select(PIN_SS_NODE);
-  #else
-    pcln("Non MNSLAC Node Hardware detected", C_ORANGE);
-    DW1000.begin(PIN_IRQ_BREAD, PIN_RST_BREAD);
-    DW1000.select(PIN_SS_BREAD);
-  #endif
+  // #ifdef DEBUG
+  if (isBase)
+  {
+    setLed(LED_RED, MODE_RAMP);
+    while (!Serial);
+    setLed(LED_RED, MODE_OFF);
+  }
+// #endif
+
+// INIT DW1000
+#ifdef MNSLAC_NODE_M0
+  pcln("MNSLAC Node Hardware detected");
+  DW1000.begin(PIN_IRQ_NODE, PIN_RST_NODE);
+  DW1000.select(PIN_SS_NODE);
+#else
+  pcln("Non MNSLAC Node Hardware detected", C_ORANGE);
+  DW1000.begin(PIN_IRQ_BREAD, PIN_RST_BREAD);
+  DW1000.select(PIN_SS_BREAD);
+#endif
 
 
   // Start a new DW1000 Config
@@ -334,12 +338,14 @@ void setup() {
   // Block Timer
   M0Timer.setup(_BLOCK_TIMER);
   M0Timer.setSingleUse(_BLOCK_TIMER);
+  M0Timer.attachTC4Handler(t_block);
   M0Timer.stop(_BLOCK_TIMER); // Not Needed
 
 
   // Frame Timer
   M0Timer.setup(_FRAME_TIMER);
   M0Timer.setSingleUse(_FRAME_TIMER);
+  M0Timer.attachTC3Handler(t_frame);
   M0Timer.stop(_FRAME_TIMER); // Not Needed
 
   // Ensure that the timers start stopped and that our flag vars are set to
@@ -431,7 +437,18 @@ void clkErrHandler() {
   clkErr = true;
 }
 
-
+void t_block(uint8_t t)
+{
+  uint32_t now = micros();
+  Serial.print("b");
+  Serial.println(now);
+}
+void t_frame(uint8_t t)
+{
+  uint32_t now = micros();
+  Serial.print("f");
+  Serial.println(now);
+}
 
 void setLed(Led led, Led_Mode mode) {
   switch (mode) {
@@ -580,6 +597,7 @@ void manage_led(Led led) {
       break;
   }
 }
+
 
 
 // Main Loop
