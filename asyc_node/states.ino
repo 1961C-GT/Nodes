@@ -672,3 +672,70 @@ void rb_decode(struct State * state)
   endSection("End Decode");
 }
 // ========================================================================== //
+
+
+
+
+// ========================================================================== //
+// STATE: COM_INIT
+//
+// -------------------------------------------------------------------------- //
+state_fn com_accpt_init, com_accpt_loop, com_decode, com_bcast_init, com_bcast_loop;
+void com_accpt_init(struct State * state)
+{
+  pcln("[State] COM_ACCPT_INIT", C_ORANGE); inc();
+
+
+
+  dec();
+  pcln("[State] COM_ACCPT_LOOP", C_ORANGE); inc();
+  state->next = com_accpt_loop;
+}
+void com_accpt_loop(struct State * state)
+{
+  // Check our timers. If one of them fires, then our state will be set as
+  // needed, based on the values we pass in.
+  if (checkTimers(state, sleep, com_bcast_init)) {
+    pcln("Timer Triggered", C_GREEN);
+    dec();
+    return;
+  }
+
+  if(checkRx()) {
+    pcln("Received Message", C_GREEN);
+    state->next = com_decode;
+    return;
+  }
+}
+void com_decode(struct State * state)
+{
+
+  state->next = com_accpt_loop;
+}
+void com_bcast_init(struct State * state)
+{
+  pcln("[State] COM_BCAST_INIT", C_ORANGE); inc();
+
+
+
+  dec();
+  pcln("[State] COM_BCAST_LOOP", C_ORANGE); inc();
+  state->next = com_bcast_loop;
+}
+void com_bcast_loop(struct State * state)
+{
+  // Check our timers. If one of them fires, then our state will be set as
+  // needed, based on the values we pass in.
+  if (checkTimers(state, sleep, com_accpt_init)) {
+    pcln("Timer Triggered Before Message Sent", C_RED);
+    dec();
+    return;
+  }
+
+  if(checkTx()) {
+    pcln("Sent Message", C_GREEN);
+    state->next = com_accpt_init;
+    dec();
+    return;
+  }
+}
