@@ -6,15 +6,14 @@
 // END IMPORTS
 
 // ========= Node IDs ========== //
-#define LEN_NODES_LIST 4
+#define LEN_NODES_LIST 6
 constexpr uint16_t nodeList[] = {
   0x2243, // BASE 1
-  0x6606,  // NODE 1
+  0x6606, // NODE 1
   0x5DCB, // BASE 2
   0xDC19, // NODE 3
-  0x726C, // RED
-  0x71E9, // BLUE
-  0xFDA0  // GREEN
+  0xBFAA, // NODE 2
+  0x805C  // NODE 4
 };
 // ========= Node IDs ========== //
 
@@ -150,7 +149,7 @@ void setup() {
   // r = 0; g = 0; b = 0; t = 0;
 
   // led_red = MODE_RAMP;
-  while(!Serial);
+  // while(!Serial);
   // delay(1000);
   // led_red = MODE_OFF;
   // led_aux = MODE_BLINK;
@@ -176,11 +175,6 @@ void setup() {
   // pcln("  -> 0xAbnfn33adas", C_RED);
   // pcln("Being Awesome", C_ORANGE);
   // endSection("SUCCESS", C_GREEN);
-
-  // #ifdef DEBUG
-  // if (!isBase)
-  //   while(!Serial);
-  // #endif
 
   // Figure out what node number we are
   // First see if we are the first address in the node list. If we are, then we
@@ -222,16 +216,26 @@ void setup() {
     }
   }
 
-  // INIT DW1000
-  #ifdef MNSLAC_NODE_M0
-    pcln("MNSLAC Node Hardware detected");
-    DW1000.begin(PIN_IRQ_NODE, PIN_RST_NODE);
-    DW1000.select(PIN_SS_NODE);
-  #else
-    pcln("Non MNSLAC Node Hardware detected", C_ORANGE);
-    DW1000.begin(PIN_IRQ_BREAD, PIN_RST_BREAD);
-    DW1000.select(PIN_SS_BREAD);
-  #endif
+  // #ifdef DEBUG
+  if (isBase)
+  {
+    led_aux = MODE_BLINK;
+    while (!Serial)
+      ;
+    led_aux = MODE_OFF;
+  }
+// #endif
+
+// INIT DW1000
+#ifdef MNSLAC_NODE_M0
+  pcln("MNSLAC Node Hardware detected");
+  DW1000.begin(PIN_IRQ_NODE, PIN_RST_NODE);
+  DW1000.select(PIN_SS_NODE);
+#else
+  pcln("Non MNSLAC Node Hardware detected", C_ORANGE);
+  DW1000.begin(PIN_IRQ_BREAD, PIN_RST_BREAD);
+  DW1000.select(PIN_SS_BREAD);
+#endif
 
 
   // Start a new DW1000 Config

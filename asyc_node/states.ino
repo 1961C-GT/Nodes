@@ -259,6 +259,7 @@ void ra_decode(struct State * state)
         pcln("Got Range Request", C_GREEN);
         break;
       default:
+        changeState = true;
         pcln("Bad Message Type", C_RED);
         // state->next = getState(rxMessage);
         break;
