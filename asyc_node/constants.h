@@ -211,5 +211,5 @@ struct Settings {
 
 // Timer Defs
 const uint8_t _LED_TIMER = M0Timer.T5;
-const uint8_t _BLOCK_TIMER = M0Timer.T3;
-const uint8_t _FRAME_TIMER = M0Timer.T4;
+const uint8_t _BLOCK_TIMER = M0Timer.T4;
+const uint8_t _FRAME_TIMER = M0Timer.T3;

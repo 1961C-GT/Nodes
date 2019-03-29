@@ -449,6 +449,12 @@ Frame getFrameFromSeq(uint8_t seq, Settings s) {
 void stopTimers() {
   M0Timer.stop(_BLOCK_TIMER);
   M0Timer.stop(_FRAME_TIMER);
+  if (M0Timer.getFired(_FRAME_TIMER)) {
+    pcln("Frame Timer Stopped Before Handle", C_RED);
+  }
+  if (M0Timer.getFired(_BLOCK_TIMER)) {
+    pcln("Block Timer Stopped Before Handle", C_RED);
+  }
 
   blockTimerSet = false;
   frameTimerSet = false;
@@ -493,6 +499,7 @@ boolean setFrameTimer(uint32_t cycleDelay, uint32_t now, boolean wrapTime = fals
   // and the delay is less than MIN_DELAY, then we cannot set the timer
   if (wrapTime) {
     while (delay < MIN_DELAY) {
+      // sprintf(medium_buf, "| → Wrap: %lu", delay); pcln(medium_buf);
       delay += settings.t_c; //settings.t_fs + settings.t_fr + settings.t_fc;
     }
   } else if (delay < MIN_DELAY) {
@@ -500,15 +507,20 @@ boolean setFrameTimer(uint32_t cycleDelay, uint32_t now, boolean wrapTime = fals
     return false;
   }
 
+  // pcln("a");
+
   // Start the frame timer with the given delay. Set it to calculate an internal
   // offset such that the timer starts as close as possible to right now.
   // TODO Should we use now instead of micros() for the offset?
   M0Timer.start(delay, _FRAME_TIMER, now);
+
+  // pcln("b");
   frameTimerSet = true;
 
 
   sprintf(medium_buf, "> Frame Timer set: %ld", delay + now); pcln(medium_buf);
   sprintf(medium_buf, "| → Delay: %lu", delay); pcln(medium_buf);
+  sprintf(medium_buf, "| → CycleDelay: %lu", cycleDelay); pcln(medium_buf);
   sprintf(medium_buf, "| → Now:   %ld", now); pcln(medium_buf);
 
   // dec();
