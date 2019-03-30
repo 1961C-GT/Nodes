@@ -3,6 +3,7 @@
 //
 // -------------------------------------------------------------------------- //
 uint8_t post_rb; // True when exited RB states. Reset in Sleep frame.
+uint8_t bcst_blocks; // True when exited RB states. Reset in Sleep frame.
 // ========================================================================== //
 
 // ========================================================================== //
@@ -27,6 +28,7 @@ void sleep(struct State * state)
 
   pcln("Setting Flags");
   post_rb = false;
+  bcst_blocks = 0;
 
   // Set the default next state
   state->next = sleep_loop;
@@ -148,7 +150,7 @@ void range_frame_init(struct State * state)
 
     state->next = ra_init;
 
-    boolean ret = updateTimers(state, sleep, rb_range,
+    boolean ret = updateTimers(state, com_frame_init, rb_range,
       settings.t_fs + settings.t_fr,
       settings.t_fs + settings.t_br * nodeNumber, now);
 
@@ -216,7 +218,7 @@ void ra_init_loop(struct State * state)
 {
   // Check our timers. If one of them fires, then our state will be set as
   // needed, based on the values we pass in.
-  if (checkTimers(state, sleep, rb_range)) {
+  if (checkTimers(state, com_frame_init, rb_range)) {
     pcln("Timer Triggered", C_GREEN);
     dec();
     return;
@@ -290,7 +292,7 @@ void ra_decode(struct State * state)
       } else {
         blockTime = settings.t_fs + settings.t_br * nodeNumber;
       }
-      boolean ret = updateTimers(state, sleep, rb_range,
+      boolean ret = updateTimers(state, com_frame_init, rb_range,
         settings.t_fs + settings.t_fr,
         blockTime, micros());
 
@@ -388,7 +390,7 @@ void ra_resp_loop(struct State * state)
   // ***###TODO Do we need these here?
   // // Check our timers. If one of them fires, then our state will be set as
   // // needed, based on the values we pass in.
-  // if (checkTimers(state, sleep, rb_range)) {
+  // if (checkTimers(state, com_frame_init, rb_range)) {
   //   return;
   // }
 
@@ -506,7 +508,7 @@ void rb_range_loop(struct State * state)
   // TODO***### Do we need this?
   // // Check our timers. If one of them fires, then our state will be set as
   // // needed, based on the values we pass in.
-  // if (checkTimers(state, sleep, ra_init)) {
+  // if (checkTimers(state, com_frame_init, ra_init)) {
   //   return;
   // }
 }
@@ -538,7 +540,7 @@ void rb_rec(struct State * state)
     pcln("Set new Frame and Block Timers", C_BLUE);
     // If we got a new clock adjustment, then we should reset our block timer
     // and frame timer to match this more accurate value
-    boolean ret = updateTimers(state, sleep, ra_init,
+    boolean ret = updateTimers(state, com_frame_init, ra_init,
       settings.t_fs + settings.t_fr,
       settings.t_fs + settings.t_br * (nodeNumber + 1), micros());
 
@@ -558,7 +560,7 @@ void rb_rec(struct State * state)
 
   // Check our timers. If one of them fires, then our state will be set as
   // needed, based on the values we pass in.
-  if (checkTimers(state, sleep, ra_init)) {
+  if (checkTimers(state, com_frame_init, ra_init)) {
     pcln("Timer Triggered", C_GREEN);
     post_rb = true;
     dec();
@@ -580,7 +582,7 @@ void rb_rec_loop(struct State * state)
 {
   // Check our timers. If one of them fires, then our state will be set as
   // needed, based on the values we pass in.
-  if (checkTimers(state, sleep, ra_init)) {
+  if (checkTimers(state, com_frame_init, ra_init)) {
     pcln("Timer Triggered", C_GREEN);
     post_rb = true;
     dec();
@@ -659,7 +661,7 @@ void rb_decode(struct State * state)
 
       // If we got a new clock adjustment, then we should reset our block timer
       // and frame timer to match this more accurate value
-      boolean ret = updateTimers(state, sleep, ra_init,
+      boolean ret = updateTimers(state, com_frame_init, ra_init,
         settings.t_fs + settings.t_fr,
         settings.t_fs + settings.t_br * (nodeNumber + 1), micros());
 
@@ -683,7 +685,7 @@ void rb_decode(struct State * state)
 
   // // Check our timers. If one of them fires, then our state will be set as
   // // needed, based on the values we pass in.
-  // if (checkTimers(state, sleep, ra_init)) {
+  // if (checkTimers(state, com_frame_init, ra_init)) {
   //   Serial.println( "[RB_DECODE] Timer Triggered");
   //   return;
   // }
@@ -695,25 +697,68 @@ void rb_decode(struct State * state)
 
 
 // ========================================================================== //
-// STATE: COM_INIT
+// FRAME: COM_FRAME
 //
 // -------------------------------------------------------------------------- //
-state_fn com_accpt_init, com_accpt_loop, com_decode, com_bcast_init, com_bcast_loop;
-void com_accpt_init(struct State * state)
+state_fn com_frame_init, com_acpt, com_acpt_loop, com_decode, com_bcst, com_bcst_loop;
+void com_frame_init(struct State * state)
 {
-  pcln("[State] COM_ACCPT_INIT", C_ORANGE); inc();
+
+  // Save the current time before we do any calculations
+  uint32_t now = micros();
+
+  // Go ahead and stop any block and frame timers now
+  stopTimers();
+
+  header("COM FRAME", C_BLACK, BG_YELLOW);
+
+  pcln("[State] COM_FRAME_INIT", C_ORANGE); inc();
 
 
+  state->next = com_acpt;
+
+  // Set only the frame timer
+  boolean prompt = setFrameTimer(settings.t_c, now);
+
+  if (!prompt) {
+    pcln("Callback Timer not set. Moving to alternate state", C_RED);
+    sprintf(medium_buf, "| → Cycle Start:  %lu", cycleStart); pcln(medium_buf);
+    sprintf(medium_buf, "| → Now:          %lu", micros()); pcln(medium_buf);
+    sprintf(medium_buf, "| → Cycle Length: %lu", settings.t_fs + settings.t_fr); pcln(medium_buf);
+    sprintf(medium_buf, "| → Own RB Time:  %lu", settings.t_fs + settings.t_br * nodeNumber); pcln(medium_buf);
+    state->next = sleep;
+  }
 
   dec();
-  pcln("[State] COM_ACCPT_LOOP", C_ORANGE); inc();
-  state->next = com_accpt_loop;
 }
-void com_accpt_loop(struct State * state)
+void com_acpt(struct State * state)
+{
+  pcln("[State] COM_ACPT", C_ORANGE); inc();
+
+  // Set this block timer
+  uint32_t delay = (settings.t_fs + settings.t_fr) + (settings.t_cl + settings.t_b + settings.t_rx) * nodeNumber + settings.t_bc * settings.n * bcst_blocks;
+  Serial.print("Calculated Delay:"); Serial.println(delay);
+  boolean prompt = setBlockTimer(delay, micros());
+  if (!prompt) {
+    pcln("Behind Schedule (Block Timer). Moving state", C_RED);
+    post_rb = true;
+    state->next = com_bcst;
+    dec();
+    return;
+  }
+
+  receiver();
+
+  state->next = com_acpt_loop;
+
+  dec();
+  pcln("[State] COM_ACPT_LOOP", C_ORANGE); inc();
+}
+void com_acpt_loop(struct State * state)
 {
   // Check our timers. If one of them fires, then our state will be set as
   // needed, based on the values we pass in.
-  if (checkTimers(state, sleep, com_bcast_init)) {
+  if (checkTimers(state, sleep, com_bcst)) {
     pcln("Timer Triggered", C_GREEN);
     dec();
     return;
@@ -727,33 +772,149 @@ void com_accpt_loop(struct State * state)
 }
 void com_decode(struct State * state)
 {
+  section("[state] COM_DECODE", C_ORANGE);
 
-  state->next = com_accpt_loop;
+  // Set the defualt next state
+  state->next = com_acpt_loop;
+
+  // Message temp value
+  rxMessage = getMessage();
+
+  sprintf(medium_buf, "Rx @:  %lu", rxTimeM0); pcln(medium_buf);
+
+  if (rxMessage.valid) {
+
+    printMessage(rxMessage);
+
+    // Adjust our clock based on the message we received.
+    sprintf(medium_buf, "Cycle Time (pre adjust):  %lu", cycleStart); pcln(medium_buf);
+    boolean adj = adjustClock(rxMessage, rxTimeM0, rxTimeDW.getAsMicroSeconds());
+    sprintf(medium_buf, "Cycle Time (post adjust): %lu", cycleStart); pcln(medium_buf);
+    switch(rxMessage.type) {
+      case COM_MSG:
+        pcln("Got Com Message", C_PURPLE);
+        break;
+      default:
+        pcln("Bad Message Type", C_RED);
+        break;
+    }
+
+    if (adj) {
+      pcln("Adjusting Timers From New Clock Settings", C_BLUE);
+
+      // If we got a new clock adjustment, then we should reset our block timer
+      // and frame timer to match this more accurate value
+
+      // TODO ###
+      uint32_t blockTime = (settings.t_fs + settings.t_fr) + (settings.t_cl + settings.t_b + settings.t_rx) * nodeNumber + settings.t_bc * settings.n * bcst_blocks;
+      // if(post_rb){
+      //   blockTime = 0; // Don't set at all
+      // } else {
+      //   blockTime = 0; // TODO ### settings.t_fs + settings.t_br * nodeNumber;
+      // }
+      boolean ret = updateTimers(state, sleep, com_bcst,
+        settings.t_c,
+        blockTime, micros());
+
+      if (!ret) {
+        pcln("Callback Timer not set. Moving to alternate state", C_RED);
+        sprintf(medium_buf, "| → Cycle Start:  %lu", cycleStart); pcln(medium_buf);
+        sprintf(medium_buf, "| → Now:          %lu", micros()); pcln(medium_buf);
+        sprintf(medium_buf, "| → Cycle Length: %lu", settings.t_fs + settings.t_fr); pcln(medium_buf);
+        sprintf(medium_buf, "| → Own RB Time:  %lu", settings.t_fs + settings.t_br * nodeNumber); pcln(medium_buf);
+        endSection("End Decode");
+        dec();
+        return;
+      }
+    }
+  } else {
+    pcln("Malformed Message", C_RED);
+  }
+
+  endSection("End Decode");
 }
-void com_bcast_init(struct State * state)
+void com_bcst(struct State * state)
 {
-  pcln("[State] COM_BCAST_INIT", C_ORANGE); inc();
+  pcln("[State] COM_BCST", C_ORANGE); inc();
 
+  // Set this block timer
+  uint64_t delay = (settings.t_fs + settings.t_fr) + (settings.t_cl + settings.t_b + settings.t_rx) * nodeNumber + settings.t_bc * settings.n * bcst_blocks + settings.t_bc;
+  boolean prompt = setBlockTimer(delay, micros());
+  if (!prompt) {
+    pcln("Behind Schedule (Block Timer). Moving state", C_RED);
+    post_rb = true;
+    state->next = com_acpt;
+    dec();
+    return;
+  }
 
+  // #################### Send the Com Message #################### //
+  // Configure for transmission
+  DW1000.newTransmit();
+  DW1000.setDefaults();
+
+  // Set this message to be from us
+  txMessage.from = nodeNumber;
+
+  // Set the sequence number to be the start of this node's range request
+  // block. This is the specific number associated with this request
+  txMessage.seq = ((settings.n + 1) * settings.n) + nodeNumber + bcst_blocks * settings.n;
+
+  // Set the message type to a range request
+  txMessage.type = COM_MSG;
+
+  // Set the length of the message data to 0
+  txMessage.len = 0;
+
+  // txMessage.data = []; // TODO ##
+
+  // Get the full length of the message (data + MAC)
+  uint8_t len = getMessageLength(txMessage);
+
+  // Create a buffer to store the byte form of the message
+  byte data[len];
+
+  // Create the message and store it in data
+  createMessage(data, txMessage);
+
+  // Set the message data to data
+  DW1000.setData(data, len);
+
+  // Set the message delay so that it sends exacty when it should (exactly t_rx
+  // after the start of this block)
+  delay = getDelayMicros((settings.t_fs + settings.t_fr) + settings.t_rx + (settings.t_cl + settings.t_b + settings.t_rx) * nodeNumber + settings.t_bc * settings.n * bcst_blocks, micros());
+
+  // Only set the delay of the message if our delay value is greater than the
+  // MIN_DELAY. Otherwise, we send out message right away (Without settings a
+  // delay)
+  if (delay > MIN_TX_DELAY) {
+    DW1000.setDelay(DW1000Time(delay, DW1000Time::MICROSECONDS));
+  }
+
+  // Start the transmission
+  DW1000.startTransmit();
+  // #################### End Message Transmission ################ //
 
   dec();
-  pcln("[State] COM_BCAST_LOOP", C_ORANGE); inc();
-  state->next = com_bcast_loop;
+  pcln("[State] COM_BCST_LOOP", C_ORANGE); inc();
+  state->next = com_bcst_loop;
 }
-void com_bcast_loop(struct State * state)
+void com_bcst_loop(struct State * state)
 {
   // Check our timers. If one of them fires, then our state will be set as
   // needed, based on the values we pass in.
-  if (checkTimers(state, sleep, com_accpt_init)) {
+  if (checkTimers(state, sleep, com_acpt)) {
     pcln("Timer Triggered Before Message Sent", C_RED);
     dec();
+    bcst_blocks++;
     return;
   }
 
   if(checkTx()) {
     pcln("Sent Message", C_GREEN);
-    state->next = com_accpt_init;
+    state->next = com_acpt;
     dec();
+    bcst_blocks++;
     return;
   }
 }
