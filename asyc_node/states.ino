@@ -806,7 +806,7 @@ void com_decode(struct State * state)
       // and frame timer to match this more accurate value
 
       // TODO ###
-      uint64_t blockTime = 0;
+      uint32_t blockTime = (settings.t_fs + settings.t_fr) + (settings.t_cl + settings.t_b + settings.t_rx) * nodeNumber + settings.t_bc * settings.n * bcst_blocks;
       // if(post_rb){
       //   blockTime = 0; // Don't set at all
       // } else {
