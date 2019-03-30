@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "/Users/keenannicholson/Library/Arduino15/packages/MNSLAC/hardware/samd/1.0.5/**"
+            ],
+            "forcedInclude": [
+                "/Users/keenannicholson/Library/Arduino15/packages/MNSLAC/hardware/samd/1.0.5/cores/arduino/Arduino.h"
+            ],
+            "macFrameworkPath": [
+                "/System/Library/Frameworks",
+                "/Library/Frameworks"
+            ],
+            "intelliSenseMode": "clang-x64",
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c11",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}

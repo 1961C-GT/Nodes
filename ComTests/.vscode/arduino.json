@@ -1,0 +1,7 @@
+{
+    "port": "/dev/cu.usbmodem14101",
+    "programmer": "AVR ISP",
+    "board": "MNSLAC:samd:node_m0",
+    "configuration": "color=use_color",
+    "sketch": "ComTests.ino"
+}
