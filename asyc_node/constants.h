@@ -2,13 +2,15 @@
 
 #define LED_PIN 13
 
-#define LEN_DATA 9
-#define LEN_MAC 3
+#define MAC_LEN 3
 
 #define TINY_BUFFER_LEN 12
 #define SMALL_BUFFER_LEN 80
 #define MEDIUM_BUFFER_LEN 120
 #define LARGE_BUFFER_LEN 255
+
+#define TRANSMIT_AUTH_CAP 15
+#define MAX_COM_ACPT 5
 
 char tiny_buf[TINY_BUFFER_LEN];
 char small_buf[SMALL_BUFFER_LEN];
@@ -31,6 +33,8 @@ char large_buf[LARGE_BUFFER_LEN];
 #define BOARD_RGB_RED 11
 #define BOARD_RGB_GREEN 7
 #define BOARD_RGB_BLUE 5
+
+#define MAX_STALL_TIME 2000
 
 // Coef for calculating the battery voltage from the BATT pin.
 // 3.31 / 1024.0 * 2 = 0.00646484375
@@ -157,13 +161,44 @@ enum Com_Type{
   COM_SLEEP
 };
 
+typedef struct various_msg
+{
+  unsigned char x[5];
+} various_msg;
+
+#define MSGS_PER_COM_STACK 4
+
+typedef struct com_stack
+{
+  uint8_t node_id : 4;     // ID of the node sending this com_stack
+  uint8_t number_msgs : 4; // Number of messages contained inside this com_stack
+  uint8_t msg_id[MSGS_PER_COM_STACK];       // Message ID Type for msg 0 inside this com_stack
+  various_msg msg[MSGS_PER_COM_STACK];
+} com_stack;
+
+//   MESSAGE FORMATS
+enum Packet_Id
+{
+  RANGE_PACKET = 1,
+  STATUS_PACKET = 2,
+  CMD_PACKET = 3
+};
+
+enum Command_Id
+{
+  COM_TRANSMIT_AUTH = 1,
+  SOFT_RESET = 2,
+};
+
+#define DATA_LEN sizeof(com_stack)
+
 // Message Structure
 struct Message {
-  uint8_t from : 4;
+  uint8_t from  : 4;
   Msg_Type type : 4;
-  uint8_t seq  : 8;
-  uint8_t len  : 4;
-  byte data[LEN_DATA];
+  uint8_t seq   : 8;
+  uint8_t len   : 8;
+  byte data[sizeof(com_stack)];
   uint8_t valid : 1;
 };
 
@@ -207,3 +242,36 @@ struct Settings {
 const uint8_t _LED_TIMER = M0Timer.T5;
 const uint8_t _BLOCK_TIMER = M0Timer.T4;
 const uint8_t _FRAME_TIMER = M0Timer.T3;
+
+#define MAX_RANGE_MESSAGES 20
+#define MAX_CMD_MESSAGES 8
+#define ALLOWABLE_HOPS 3
+
+#pragma pack(push, 1)
+typedef struct range_msg
+{                       // 5 Bytes
+  uint8_t from : 4;     // Node ID of the originating node
+  uint8_t to : 4;       // Node ID of the other node in the ranging
+  uint8_t seq : 5;  // Unique message number
+  uint8_t hops : 3;     // Total allowed remaining hops for this message
+  uint32_t range : 24;  // Raw range value
+} range_msg;
+#pragma pack(pop)
+
+typedef struct stats_msg
+{                      // 5 Bytes
+  uint8_t from : 4;    // Node ID of the originating node
+  uint8_t seq : 5; // Unique message number
+  uint8_t hops : 3;    // Total allowed remaining hops for this message
+  uint16_t bat : 8;    // Raw battery voltage value
+  uint16_t heading : 9; // Raw heading value
+  int pad : 11;        // Extra padding to make 5 byte aligned
+} stats_msg;
+
+typedef struct cmd_msg
+{                      // 5 Bytes
+  uint8_t seq : 5; // Unique message number
+  uint8_t cmd_id : 5;  // Command ID
+  uint8_t hops : 3;    // Total allowed remaining hops for this message
+  uint32_t data : 27;  // Command data
+} cmd_msg;

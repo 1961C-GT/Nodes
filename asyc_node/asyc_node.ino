@@ -8,19 +8,42 @@
 // ========= Node IDs ========== //
 #define LEN_NODES_LIST 4
 constexpr uint16_t nodeList[] = {
+  0x2243, // BASE 1
   0x5DCB, // BASE 2
+  0x805C, // NODE 4
   // 0x6606, // NODE 1
   // 0xDC19, // NODE 3
   0xBFAA, // NODE 2
-  0x805C, // NODE 4
-  0x2243, // BASE 1
-  // 0xDEAD  // FILLER
+  
+
+    // 0xDEAD  // FILLER
 };
 // ========= Node IDs ========== //
+
+uint32_t milliTimer;
+
+uint8_t msg_seq = 0;
+
+// True if we can send it
+uint32_t packet_sendable[LEN_NODES_LIST];
+
+// uint8_t range_array_pointer = 0;
+// range_msg range_array[MAX_RANGE_MESSAGES];
+
+uint8_t buffer_start = 0;
+uint8_t buffer_num = 0;
+various_msg packet_buffer[MAX_RANGE_MESSAGES];
+uint8_t packet_buffer_IDs[MAX_RANGE_MESSAGES];
+
+uint8_t ta_msg_seq = 0;
+uint8_t cmd_buffer_len = 0;
+various_msg cmd_buffer[MAX_CMD_MESSAGES];
 
 
 uint8_t nodeNumber;
 boolean isBase;
+
+boolean softReset;
 
 // Global Settings
 Settings settings;
@@ -66,10 +89,11 @@ volatile boolean blink;
 // Cycle Timing
 uint32_t cycleStart;
 int cycleValid;
+int transmitAuthorization;
+
 uint8_t lastSequenceNumber;
 uint8_t rangeRequestFrom;
 uint8_t rangeRequestSeq;
-boolean transmitAuthorization;
 
 // Timers
 boolean frameTimerSet;
@@ -120,12 +144,20 @@ void setup() {
     .t_s     = 5000,  // Time for the sleep frame
   };
 
+  // Set all of our packets as sendable
+  for (int i = 0; i < LEN_NODES_LIST; i++) {
+    packet_sendable[i] = 0xFFFFFFFF;
+  }
+
   // Set up our cycle information vars
   cycleStart = 0;
   cycleValid = 0;
+  transmitAuthorization = 0;
+  softReset = false;
+  
   lastSequenceNumber = 0;
 
-  transmitAuthorization = false;
+
 
   pinMode(LED_PIN, OUTPUT);
   pinMode(BOARD_RGB_RED, OUTPUT);
@@ -139,20 +171,20 @@ void setup() {
   // Start the serial interface
   Serial.begin(256000);
 
+
+
   // float r, g, b, t;
   // r = 0; g = 0; b = 0; t = 0;
 
 
   // setLed(LED_RED, MODE_RAMP);
-  while(!Serial);
+  // while(!Serial);
   // setLed(LED_RED, MODE_OFF);
-
 
   header("ASYC NODE", C_BLACK, BG_YELLOW);
   inc();
   // header("SLEEP FRAME", C_BLACK, BG_GREEN);
   // header("RANGE FRAME", C_WHITE, BG_RED);
-
 
 
   // pcln("Program Boot", BG_RED_C_WHITE);
@@ -213,8 +245,13 @@ void setup() {
   if (isBase)
   {
     setLed(LED_RED, MODE_RAMP);
+    Serial5.begin(256000);
     while (!Serial);
+    Serial5.println("Base Station Data Serial");
     setLed(LED_RED, MODE_OFF);
+
+    Serial.println(sizeof(various_msg));
+    Serial.println(sizeof(cmd_msg));
   }
 // #endif
 
@@ -363,9 +400,9 @@ void setup() {
   if (isBase) {
     // state = { rb_range };
     cycleValid = 10;
+    transmitAuthorization = 50;
     cycleStart = micros();
     lastSequenceNumber = 255;
-    transmitAuthorization = true;
   }
 
   // Reset indentation
