@@ -9,22 +9,22 @@
 // END IMPORTS
 
 // ========= Node IDs ========== //
-#define LEN_NODES_LIST 4
+#define LEN_NODES_LIST 6
 constexpr uint16_t nodeList[] = {
   0x2243, // BASE 1
   0x5DCB, // BASE 2
-  0x805C, // NODE 4
-  // 0x6606, // NODE 1
-  // 0xDC19, // NODE 3
+  0x6606, // NODE 1
   0xBFAA, // NODE 2
+  0xDC19, // NODE 3
+  0x805C, // NODE 4
 };
 constexpr Antenna_Delay antennaDelayList[] {
-    SHORT_ANTENNA, // BASE 1
-    SHORT_ANTENNA, // BASE 2
-    LONG_ANTENNA, // NODE 4
-    // SHORT_ANTENNA, // NODE 1
-    // SHORT_ANTENNA, // NODE 3
-    LONG_ANTENNA, // NODE 2
+    LONG_ANTENNA, // BASE 1
+    LONG_ANTENNA, // BASE 2
+    SHORT_ANTENNA, // NODE 4
+    SHORT_ANTENNA, // NODE 1
+    SHORT_ANTENNA, // NODE 3
+    SHORT_ANTENNA, // NODE 2
 };
 // ========= Node IDs ========== //
 
@@ -149,7 +149,7 @@ void setup() {
 
   // === Define some default settigs =========================================//
   settings = {
-    .mode    = DW1000.MODE_LONGDATA_RANGE_LOWPOWER,
+    .mode    = DW1000.MODE_LONGDATA_RANGE_ACCURACY,
     .channel = DW1000.CHANNEL_3,
 
     .n       = LEN_NODES_LIST,
@@ -304,7 +304,7 @@ void setup() {
   setAddresses(0xDECA); // Want to change to 1961 but the mac address stuff is hardcoded
 
   // Enable our Mode
-  DW1000.enableMode(DW1000.MODE_LONGDATA_RANGE_LOWPOWER);
+  DW1000.enableMode(settings.mode);
 
   DW1000.interruptOnRxPreambleDetect(false);
   DW1000.interruptOnTxPreambleSent(false);

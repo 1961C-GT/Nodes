@@ -87,7 +87,7 @@ void sleep(struct State * state)
       int heading = 0xFFFF;
 
       if (magEnabled) {
-        sensors_event_t event; 
+        sensors_event_t event;
         mag.getEvent(&event);
         heading = (int) ((atan2(event.magnetic.z,event.magnetic.x) * 180) / 3.14159f);
         if (heading < 0) {
@@ -101,10 +101,13 @@ void sleep(struct State * state)
       }
     }
 
-    setFrameTimer(settings.t_fs, cycleStart, true);
+    boolean prompt = setFrameTimer(settings.t_fs, cycleStart, true);
+
+    // If we change states now, then blink the green light
+    if (!prompt)
+      setLed(LED_GREEN,MODE_CHIRP);
 
     setLed(LED_BLUE, MODE_OFF);
-    setLed(LED_GREEN,MODE_CHIRP);
   } else {
     setLed(LED_BLUE, MODE_BLINK);
   }
@@ -123,7 +126,7 @@ void sleep(struct State * state)
   sprintf(medium_buf, "Transmit Authorization Value: %d", transmitAuthorization); pcln(medium_buf);
 
 
-  // If we are are the base station, then we want to serial all of our 
+  // If we are are the base station, then we want to serial all of our
   // data out
   if (isBase) {
 
@@ -144,7 +147,7 @@ void sleep(struct State * state)
 
       softReset = true;
     }
-    
+
 
     // Print out our incomming messages
     various_msg packet;
@@ -153,8 +156,8 @@ void sleep(struct State * state)
       switch(packet_id) {
         case RANGE_PACKET:
           {
-            range_msg * msg = (range_msg *) &packet; 
-            
+            range_msg * msg = (range_msg *) &packet;
+
             Serial5.print("Range Packet | Cycle:"); Serial5.print(cycle_counter);
             Serial5.print(",\tFrom:"); Serial5.print(msg -> from);
             Serial5.print(",\tTo:"); Serial5.print(msg -> to);
@@ -165,11 +168,11 @@ void sleep(struct State * state)
           break;
         case STATUS_PACKET:
           {
-            stats_msg * msg = (stats_msg *) &packet; 
-            
+            stats_msg * msg = (stats_msg *) &packet;
+
             Serial5.print("Stats Packet | Cycle:"); Serial5.print(cycle_counter);
-            Serial5.print(",\tFrom:"); Serial5.print(msg->from); 
-            Serial5.print(",\t\tSeq:"); Serial5.print(msg->seq); 
+            Serial5.print(",\tFrom:"); Serial5.print(msg->from);
+            Serial5.print(",\t\tSeq:"); Serial5.print(msg->seq);
             Serial5.print(",\tHops:"); Serial5.print(msg->hops);
             Serial5.print(",\tBat:"); Serial5.print(msg->bat * BATT_MEAS_COEFF);
             Serial5.print(",\tTemp:"); Serial5.print(DW1000.convertTemp(msg->temp));
@@ -214,6 +217,7 @@ void sleep_loop(struct State * state)
   // See if it is time to leave the sleep frame. The block state is set to the
   // sleep frame so that if it is set (incorrecly), we will not leave sleep mode
   if (checkTimers(state, range_frame_init, sleep)) {
+    setLed(LED_GREEN,MODE_CHIRP);
     // cycleStart = micros() - settings.t_fs;
     pcln("Timer Triggered", C_GREEN);
     dec();
@@ -790,9 +794,12 @@ void rb_decode(struct State * state)
           Serial.println(dist);
           // Store this range to the distance_meas array
           // distance_meas[rxMessage.from] = dist;
-          range_msg rm = {.from = nodeNumber, .to = rxMessage.from, .seq = getMsgSeq(), .hops = ALLOWABLE_HOPS, .range = (uint32_t)(dist*1000.0)};
-          if (!putPacketInBuffer((various_msg *)&rm, RANGE_PACKET)) {
-            pcln("Packet Buffer Full. Overwrote Message", C_RED);
+
+          if (dist <= MAX_VALID_DISTANCE) { // distance is in meters here
+            range_msg rm = {.from = nodeNumber, .to = rxMessage.from, .seq = getMsgSeq(), .hops = ALLOWABLE_HOPS, .range = (uint32_t)(dist*1000.0)}; // Distance is encoded in mm
+            if (!putPacketInBuffer((various_msg *)&rm, RANGE_PACKET)) {
+              pcln("Packet Buffer Full. Overwrote Message", C_RED);
+            }
           }
 
         } else {
@@ -890,7 +897,7 @@ void com_frame_init(struct State * state)
 void com_acpt(struct State * state)
 {
   pcln("[State] COM_ACPT", C_ORANGE); inc();
-  
+
   com_acpt_blocks ++;
 
   if (com_acpt_blocks > settings.n_com + 2) {
@@ -899,7 +906,7 @@ void com_acpt(struct State * state)
     return;
   }
 
-  if (checkMillis(state)){ 
+  if (checkMillis(state)){
     state->next = sleep;
     dec();
     return;
@@ -1020,7 +1027,7 @@ void com_bcst(struct State * state)
     return;
   }
 
-  if (checkMillis(state)){ 
+  if (checkMillis(state)){
     dec();
     return;
   }
@@ -1106,7 +1113,7 @@ void com_bcst_loop(struct State * state)
     dec();
     return;
   }
-  
+
   // Check our timers. If one of them fires, then our state will be set as
   // needed, based on the values we pass in.
   if (checkTimers(state, sleep, com_acpt)) {

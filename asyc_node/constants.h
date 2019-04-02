@@ -11,6 +11,7 @@
 
 #define TRANSMIT_AUTH_CAP 15
 #define MAX_COM_ACPT 5
+#define MAX_VALID_DISTANCE 500 // in meters
 
 char tiny_buf[TINY_BUFFER_LEN];
 char small_buf[SMALL_BUFFER_LEN];
