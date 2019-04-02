@@ -314,6 +314,8 @@ void setup() {
   // Set our antenna delay
   DW1000.setAntennaDelay(antennaDelayList[nodeNumber]);
 
+  DW1000.setManualPower(0x1F1F1F1FL);
+
   // Commit the config to the DW1000
   DW1000.commitConfiguration();
 
@@ -387,9 +389,9 @@ void setup() {
   DW1000.getPrintableDeviceMode(msg);
   sprintf(medium_buf, "Device Mode: %s", msg); pcln(medium_buf);
   sprintf(medium_buf, "Antenna Delay: %d", DW1000.getAntennaDelay()); pcln(medium_buf);
+  sprintf(medium_buf, "Power Setting: %08X", DW1000.getManualPower()); pcln(medium_buf);
 
   endSection("Boot Success\n\r", C_GREEN);
-
   printSettings(settings);
 
   // Set up recieve mode
