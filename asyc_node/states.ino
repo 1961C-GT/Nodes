@@ -644,6 +644,13 @@ void rb_range(struct State * state)
 void rb_range_loop(struct State * state)
 {
 
+  if (checkTimers(state, com_frame_init, ra_init)) {
+    receiver();
+    pcln("Timer Fired Before Message Sent", C_RED);
+    dec();
+    return;
+  }
+
   if(checkTx()) {
     receiver();
     sprintf(medium_buf, "Message Sent At %lu", txTimeM0); pcln(medium_buf, C_GREEN);

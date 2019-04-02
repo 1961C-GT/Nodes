@@ -18,6 +18,7 @@ constexpr uint16_t nodeList[] = {
   0xDC19, // NODE 3
   0x805C, // NODE 4
 };
+
 constexpr Antenna_Delay antennaDelayList[] {
     LONG_ANTENNA, // BASE 1
     LONG_ANTENNA, // BASE 2
@@ -132,6 +133,7 @@ void setup() {
   cycle_counter = 0;
 
   magEnabled = false;
+
 
 
   // LED Timer
@@ -267,7 +269,7 @@ void setup() {
   {
     setLed(LED_RED, MODE_RAMP);
     Serial5.begin(256000);
-    while (!Serial);
+    // while (!Serial);
     Serial5.println("Base Station Data Serial");
     setLed(LED_RED, MODE_OFF);
 
@@ -358,8 +360,8 @@ void setup() {
 
 
 
-  if (isBase)
-    while(!Serial);
+  // if (isBase)
+  //   while(!Serial);
 
   // Print details about our node number
   section("System Boot");
