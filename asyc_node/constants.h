@@ -250,7 +250,7 @@ const uint8_t _LED_TIMER = M0Timer.T5;
 const uint8_t _BLOCK_TIMER = M0Timer.T4;
 const uint8_t _FRAME_TIMER = M0Timer.T3;
 
-#define MAX_RANGE_MESSAGES 20
+#define MAX_RANGE_MESSAGES 50
 #define MAX_CMD_MESSAGES 8
 #define ALLOWABLE_HOPS 3
 
