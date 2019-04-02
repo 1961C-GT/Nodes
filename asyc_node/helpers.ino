@@ -7,6 +7,7 @@ extern char *__brkval;
 
 #ifdef MNSLAC_NODE_M0
   float getBattVoltage() { return analogRead(BATT) * BATT_MEAS_COEFF; }
+  uint16_t getBattVoltageBits() { return analogRead(BATT); }
 #else
   float getBattVoltage() { return 0.0f; }
 #endif
@@ -49,10 +50,10 @@ void receiver() {
 Message getMessage() {
 
   // Create a data buffer
-  byte data[LEN_MAC + LEN_DATA];
+  byte data[MAC_LEN + DATA_LEN];
 
   // Populate the main data buffer
-  DW1000.getData(data, LEN_MAC + LEN_DATA);
+  DW1000.getData(data, MAC_LEN + DATA_LEN);
 
   // Get the length of this message
   uint8_t dataLength = DW1000.getDataLength();
@@ -83,12 +84,12 @@ Message getMessage(byte data[], uint8_t dataLength) {
     byte *ptr = (byte *)data;
 
     // Copy the payload portion of data into msg.data. Notice that this starts
-    // at data[LEN_MAC] and steps for dataLength-LEN_MAC bytes. This can be
+    // at data[MAC_LEN] and steps for dataLength-MAC_LEN bytes. This can be
     // zero bytes if no payload is recieved
-    memcpy(msg.data, ptr + LEN_MAC, dataLength - LEN_MAC);
+    memcpy(msg.data, ptr + MAC_LEN, dataLength - MAC_LEN);
 
     // Store the length of the payload in msg
-    msg.len = dataLength - LEN_MAC;
+    msg.len = dataLength - MAC_LEN;
 
     // Set this message to valid
     msg.valid = 1;
@@ -96,9 +97,282 @@ Message getMessage(byte data[], uint8_t dataLength) {
   return msg;
 }
 
+
+// Returns true if we can send this sequence number (and thus
+// we should store it until our next bcast)
+boolean processSequenceNumber(uint8_t from, uint8_t seq) {
+
+  if (from > LEN_NODES_LIST) {
+    pcln("Invalid From Address Detected", C_RED);
+    return false;
+  }
+
+  if (seq > 31) {
+    pcln("Invalid Sequance Detected", C_RED);
+    return false;
+  }
+
+  boolean ret = (packet_sendable[from] >> seq) & 0x1;
+
+
+  if (ret) {
+    
+    // If this sequence is sendable, then we should assume it will
+    // be sent. Mark this sequence as unsendable to prevent us from 
+    // receiving any additional copies
+    // packet_sendable[from] = packet_sendable[from] | (0x1 << seq);
+    packet_sendable[from] = packet_sendable[from] & ~(0x1 << seq); // Set to false
+    // number &= ~(1UL << n);
+
+    // Clear (set to true) the opposite half of the packet sendable list to allow
+    // new packets from this node to come in under different
+    // sequence numbers
+    
+    // 0b0000000////////////////000000001 idx 0
+    // 0b00000000000000000000000000000001
+    // 0b00000001111111111111111000000000
+
+    // 0b////////////////0000000010000000 idx 7
+    // 0b00000000000000000000000010000000
+    // 0b11111111111111110000000000000000
+    if (seq <= 7) {
+      packet_sendable[from] = packet_sendable[from] | (0xFFFF0000 >> (7 - seq));
+    }
+
+    // 0b///////////////0000000010000000/ idx 8
+    // 0b00000000000000000000000100000000
+    // 0b11111111111111100000000000000001
+
+    // 0b/0000000010000000/////////////// idx 22
+    // 0b00000000010000000000000000000000
+    // 0b10000000000000000111111111111111
+    else if (seq <= 22) {
+      packet_sendable[from] = packet_sendable[from] | (0x00007FFF >> (22 - seq));
+      packet_sendable[from] = packet_sendable[from] | (0xFFFE0000 << (seq - 8));
+    } 
+
+
+    // 0b0000000010000000//////////////// idx 23
+    // 0b00000000100000000000000000000000
+    // 0b00000000000000001111111111111111
+
+    // 0b10000000////////////////00000000 idx 31
+    // 0b10000000000000000000000000000000
+    // 0b00000000111111111111111100000000
+    else {
+      packet_sendable[from] = packet_sendable[from] | (0x0000FFFF << (seq - 23));
+    }
+  }
+
+  return ret;
+}
+
+
+void processMessage(Message msg){
+  if (msg.valid && msg.len == sizeof(com_stack)) {
+    com_stack *msg_com_stack = (com_stack *)msg.data;
+    pcln("Decoded COM Stack", C_ORANGE);
+    sprintf(medium_buf, "| → node_id: %u", msg_com_stack -> node_id); pcln(medium_buf);
+    sprintf(medium_buf, "| → number_msgs: %u", msg_com_stack -> number_msgs); pcln(medium_buf);
+
+    for (uint8_t i = 0; i < msg_com_stack->number_msgs; i++){
+      if (msg_com_stack->msg_id[i] == RANGE_PACKET){ // Range Message
+        range_msg * rm = (range_msg *)&msg_com_stack->msg[i];
+
+        if ((rm->hops > 0 || isBase) && rm->from != nodeNumber && processSequenceNumber(rm->from, rm->seq)) {
+
+          rm->hops --;
+
+          if (!putPacketInBuffer((various_msg *)rm, RANGE_PACKET)) {
+            pcln("Packet Buffer Full. Overwrote Message", C_RED);
+          }
+
+          sprintf(medium_buf, "Processed Range Packet: %u", packet_sendable[rm->from]); pcln(medium_buf);
+          sprintf(medium_buf, "| → From:  %u", rm -> from); pcln(medium_buf);
+          sprintf(medium_buf, "| → To:    %u", rm -> to); pcln(medium_buf);
+          sprintf(medium_buf, "| → Seq:   %u", rm -> seq); pcln(medium_buf);
+          sprintf(medium_buf, "| → Hops:  %u", rm -> hops); pcln(medium_buf);
+          sprintf(medium_buf, "| → Range: %u", rm -> range); pcln(medium_buf);
+
+        } else if (isBase){
+          Serial5.print("Discarded Range Packet due to Seq (Host: "); Serial5.print(msg.from); 
+          Serial5.print(", Seq: "); Serial5.print(rm->seq); 
+          Serial5.print(", From: "); Serial5.print(rm->from); 
+          Serial5.print(", To: "); Serial5.print(rm->to); 
+          Serial5.print(", Hops: "); Serial5.print(rm->hops);
+          Serial5.print(", Sendable: "); Serial5.print(packet_sendable[rm->from]); 
+          Serial5.println(")");
+        } else {
+          pcln("Range Packet Failed Seq or Hops", C_ORANGE);
+          sprintf(medium_buf, "| → From:  %u", rm -> from); pcln(medium_buf);
+          sprintf(medium_buf, "| → To:    %u", rm -> to); pcln(medium_buf);
+          sprintf(medium_buf, "| → Seq:   %u", rm -> seq); pcln(medium_buf);
+          sprintf(medium_buf, "| → Hops:  %u", rm -> hops); pcln(medium_buf);
+          sprintf(medium_buf, "| → Range: %u", rm -> range); pcln(medium_buf);
+        }
+
+        // memcpy(&range_array[range_array_pointer], rm, sizeof(range_msg));
+        // packet_life
+
+      } else if (msg_com_stack->msg_id[i] == STATUS_PACKET){
+        stats_msg * sm = (stats_msg *)&msg_com_stack->msg[i];
+
+        if ((sm->hops > 0 || isBase) && sm->from != nodeNumber && processSequenceNumber(sm->from, sm->seq)) {
+          sm->hops --;
+
+          if (!putPacketInBuffer((various_msg *)sm, STATUS_PACKET)) {
+            pcln("Packet Buffer Full. Overwrote Message", C_RED);
+          }
+
+          sprintf(medium_buf, "Processed Stats Packet: %u", packet_sendable[sm->from]); pcln(medium_buf);
+          // sprintf(medium_buf, "| → From:  %u", sm -> from); pcln(medium_buf);
+          // sprintf(medium_buf, "| → Seq:   %u", sm -> seq); pcln(medium_buf);
+          // sprintf(medium_buf, "| → Hops:  %u", sm -> hops); pcln(medium_buf);
+          // sprintf(medium_buf, "| → Bat: %u", sm -> bat); pcln(medium_buf);
+          // sprintf(medium_buf, "| → Heading: %u", sm -> heading); pcln(medium_buf);
+          // sprintf(medium_buf, "| → Temp: %u", sm -> temp); pcln(medium_buf);
+
+        } 
+        
+        else if (isBase){
+          Serial5.print("Discarded Stats Packet due to Seq (Host: "); Serial5.print(msg.from); Serial5.println(")");
+        //   Serial5.print(", Seq: "); Serial5.print(sm->seq); 
+        //   Serial5.print(", From: "); Serial5.print(sm->from); 
+        //   Serial5.print(", Hops: "); Serial5.print(sm->hops);
+        //   Serial5.print(", Bat: "); Serial5.print(sm->bat);
+        //   Serial5.print(", Heading: "); Serial5.print(sm->heading);
+        //   Serial5.print(", Temp: "); Serial5.print(sm->temp);
+        //   Serial5.print(", Sendable: "); Serial5.print(packet_sendable[sm->from]); 
+        //   Serial5.println(")");
+        } else {
+          sprintf(medium_buf, "Stats Packet Failed Seq or Hops: %u", packet_sendable[sm->from]); pcln(medium_buf);
+        }
+        
+      } else if (msg_com_stack->msg_id[i] == CMD_PACKET) {
+
+        // The base station does not relay or process command packets. Continue to
+        // the next packet
+        if (isBase)
+          continue;
+
+        // Cast our data to a command packet type
+        cmd_msg * cm = (cmd_msg *)&msg_com_stack->msg[i];
+
+        // Ensure that the packet is good (note that they are always from
+        // the base station [node 0])
+        if (processSequenceNumber(0, cm->seq)) {
+
+          pcln("Command Packet Received", C_ORANGE);
+          sprintf(medium_buf, "| → Seq:    %u", cm -> seq); pcln(medium_buf);
+          sprintf(medium_buf, "| → Hops:   %u", cm -> hops); pcln(medium_buf);
+          sprintf(medium_buf, "| → Cmd_ID: %u", cm -> cmd_id); pcln(medium_buf);
+
+          // Handle this command
+          switch (cm->cmd_id) {
+            case COM_TRANSMIT_AUTH:
+
+              sprintf(medium_buf, "| → Transmit Authorization Accepted"); pcln(medium_buf, C_GREEN);
+
+              // If our transmit authorization was zero, then we should clear the 
+              // packet buffer before moving on (so that we don't send really old
+              // messages)
+              if (transmitAuthorization == 0) {
+                // Clear the packet buffer
+                clearPacketBuffer();
+              }
+
+              // Up our transmit authorization
+              transmitAuthorization = TRANSMIT_AUTH_CAP;
+              break;
+            
+            case SOFT_RESET:
+              sprintf(medium_buf, "| → Soft Reset", cm -> cmd_id); pcln(medium_buf, D_BLINK_C_CYAN);
+              softReset = true;
+              break;
+            default:
+              sprintf(medium_buf, "Unknown Command Id: %u", cm->cmd_id); pcln(medium_buf, C_RED);
+              break;
+          }
+
+          // Only add this command to our buffer if it has at least one hop left
+          if (cm->hops > 0) {
+            // Age the packet by one hop
+            cm->hops --;
+            if (!putPacketInBuffer((various_msg *)cm, CMD_PACKET)) {
+              pcln("Packet Buffer Full. Overwrote Message", C_RED);
+            }
+          }
+        }
+      }else{
+        sprintf(medium_buf, "Unknown Packet Type: %u", msg_com_stack->msg_id[i]); pcln(medium_buf, C_RED);
+      }
+    } 
+  }
+}
+
+// typedef struct cmd_msg
+// {                      // 5 Bytes
+//   uint8_t seq : 5; // Unique message number
+//   uint8_t cmd_id : 5;  // Command ID
+//   uint8_t hops : 3;    // Total allowed remaining hops for this message
+//   uint32_t data : 27;  // Command data
+// } cmd_msg;
+
+void loadPackets(Message * msg)
+{
+  uint8_t num_messages = 0;
+  uint8_t ids[MSGS_PER_COM_STACK];
+  various_msg v_packets[MSGS_PER_COM_STACK];
+
+  if (isBase) {
+    if (cmd_buffer_len == 0) {
+      msg->len = 0;
+      return;
+    }
+
+    msg->len = (uint8_t)sizeof(com_stack);
+    for (uint8_t i = 0; i < MSGS_PER_COM_STACK; i++){
+      if (cmd_buffer_len == 0) {
+        break;
+      } else {
+        cmd_buffer_len --;
+        memcpy(&v_packets[i], &cmd_buffer[cmd_buffer_len], sizeof(various_msg));
+        ids[i] = CMD_PACKET;
+        num_messages ++;
+      }
+    }
+  } else {
+    if (getBufferLength() == 0) {
+      msg->len = 0;
+      return;
+    }
+
+
+    msg->len = (uint8_t)sizeof(com_stack);
+    for (uint8_t i = 0; i < MSGS_PER_COM_STACK; i++){
+      uint8_t id;
+      if (getPacketFromBuffer(&v_packets[i], &ids[i])) {
+        num_messages ++;
+      } else {
+        break;
+      }
+      // ids[i] = RANGE_PACKET;
+      // memcpy(&v_packets[i], &range_array[range_array_pointer], sizeof(various_msg));
+    }
+  }
+
+  com_stack msg_com_stack = {.node_id = nodeNumber, .number_msgs = num_messages};
+  memcpy(&msg_com_stack.msg_id, &ids, MSGS_PER_COM_STACK);
+  memcpy(&msg_com_stack.msg, &v_packets, sizeof(various_msg)*MSGS_PER_COM_STACK);
+  memcpy(&msg->data, &msg_com_stack, sizeof(com_stack));
+  sprintf(medium_buf, "Loaded %u packets into message", num_messages); pcln(medium_buf, C_BLUE);
+}
+// uint8_t range_array_pointer = 0;
+// range_msg range_array[MAX_RANGE_MESSAGES];
+
 // Get the length of a message object
 int getMessageLength(Message msg) {
-  return LEN_MAC + msg.len;
+  return MAC_LEN + msg.len;
 }
 
 // Create a message from the given message struct and place the result into
@@ -138,6 +412,64 @@ uint32_t getRangeRecDelay(uint8_t nodeNum, Settings s) {
   }
 }
 
+// uint8_t buffer_start = 0;
+// uint8_t buffer_num = 0;
+// various_msg packet_buffer[MAX_RANGE_MESSAGES];
+// uint8_t packet_buffer_IDs[MAX_RANGE_MESSAGES];
+
+uint8_t getBufferLength() {
+  return buffer_num;
+}
+
+void clearPacketBuffer() {
+  buffer_num = 0;
+  buffer_start = 0; 
+}
+
+boolean getPacketFromBuffer(various_msg * packet, uint8_t * id)
+{
+  if (buffer_num == 0)
+    return false;
+
+  // packet = &packet_buffer[buffer_start];
+  memcpy(packet, &packet_buffer[buffer_start], sizeof(various_msg));
+  *id = packet_buffer_IDs[buffer_start];
+
+  buffer_start++;
+  if (buffer_start >= MAX_RANGE_MESSAGES)
+    buffer_start = 0;
+  
+  buffer_num--;
+
+  return true;
+}
+
+boolean putPacketInBuffer(various_msg * packet, uint8_t id)
+{
+  boolean ret = true;
+
+  if (buffer_num == MAX_RANGE_MESSAGES) {
+    ret = false;
+    buffer_start ++;
+    buffer_num --;
+  }
+
+  uint8_t idx = buffer_start + buffer_num;
+
+  if (idx >= MAX_RANGE_MESSAGES)
+  {
+    idx -= MAX_RANGE_MESSAGES;
+  }
+
+  memcpy(&packet_buffer[idx], packet, sizeof(various_msg));
+  packet_buffer_IDs[idx] = id;
+
+  buffer_num ++;
+
+  return ret;
+}
+
+
 void printSettings(Settings s) {
   section("System Settings", C_ORANGE);
   sprintf(medium_buf, "%-8s%d", "n:", s.n); pcln(medium_buf, C_RED);
@@ -160,7 +492,7 @@ void printSettings(Settings s) {
 }
 
 float runningTotal;
-double computeRange(DW1000Time& rec, uint8_t fromId) {
+float computeRange(DW1000Time& rec, uint8_t fromId) {
 
 
   // The total time between our poll message being sent and the reply being
@@ -183,7 +515,7 @@ double computeRange(DW1000Time& rec, uint8_t fromId) {
   // Serial.print(", Received:"); Serial.print(rec.getAsMicroSeconds());
   // Serial.print(", Dist:"); Serial.println(distance);
 
-  return (double)distance;
+  return distance;
 }
 
 // TODO Finish adjust clock
@@ -553,5 +885,100 @@ boolean checkTimers(struct State * state, state_fn * frameState, state_fn * bloc
     return true;
   }
 
+  if (millis() - milliTimer > MAX_STALL_TIME) {
+    sprintf(medium_buf, "> Stall Timer Fired %lu", micros()); pcln(medium_buf);
+    state->next = sleep;
+    cycleValid = 0;
+    return true;
+  }
+
   return false;
+}
+
+boolean checkMillis(struct State * state) {
+  if (millis() - milliTimer > MAX_STALL_TIME) {
+    sprintf(medium_buf, "> Stall Timer Fired %lu", micros()); pcln(medium_buf);
+    state->next = sleep;
+    cycleValid = 0;
+    return true;
+  }
+  return false;
+}
+
+uint8_t getMsgSeq(){
+  uint8_t tmp = msg_seq;
+  msg_seq++;
+  if(msg_seq > 31){
+    msg_seq = 0;
+  }
+  return tmp;
+}
+
+
+void hexDump(char *desc, void *addr, int len)
+{
+  int i;
+  unsigned char buff[17];
+  unsigned char *pc = (unsigned char *)addr;
+
+  // Output description if given.
+  if (desc != NULL)
+  {
+    sprintf(large_buf, "%s:\n\r", desc);
+    Serial.print(large_buf);
+  }
+
+  if (len == 0)
+  {
+    Serial.print("  ZERO LENGTH\n\r");
+    return;
+  }
+  if (len < 0)
+  {
+    sprintf(large_buf, "  NEGATIVE LENGTH: %i\n\r", len);
+    Serial.print(large_buf);
+    return;
+  }
+
+  // Process every byte in the data.
+  for (i = 0; i < len; i++)
+  {
+    // Multiple of 16 means new line (with line offset).
+
+    if ((i % 16) == 0)
+    {
+      // Just don't print ASCII for the zeroth line.
+      if (i != 0)
+      {
+        sprintf(large_buf, "  %s\n\r", buff);
+        Serial.print(large_buf);
+      }
+
+      // Output the offset.
+      sprintf(large_buf, "  %04x ", i);
+      Serial.print(large_buf);
+    }
+
+    // Now the hex code for the specific character.
+    sprintf(large_buf, " %02x", pc[i]);
+    Serial.print(large_buf);
+
+    // And store a printable ASCII character for later.
+    if ((pc[i] < 0x20) || (pc[i] > 0x7e))
+      buff[i % 16] = '.';
+    else
+      buff[i % 16] = pc[i];
+    buff[(i % 16) + 1] = '\0';
+  }
+
+  // Pad out last line if not exactly 16 characters.
+  while ((i % 16) != 0)
+  {
+    Serial.print("   ");
+    i++;
+  }
+
+  // And print the final ASCII bit.
+  sprintf(large_buf, "  %s\n\r", buff);
+  Serial.print(large_buf);
 }

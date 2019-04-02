@@ -4,6 +4,7 @@
 // -------------------------------------------------------------------------- //
 uint8_t post_rb; // True when exited RB states. Reset in Sleep frame.
 uint8_t bcst_blocks; // True when exited RB states. Reset in Sleep frame.
+uint8_t com_acpt_blocks; // True when exited RB states. Reset in Sleep frame.
 // ========================================================================== //
 
 // ========================================================================== //
@@ -13,6 +14,14 @@ uint8_t bcst_blocks; // True when exited RB states. Reset in Sleep frame.
 state_fn sleep, sleep_loop, sleep_decode;
 void sleep(struct State * state)
 {
+
+  // If our reset flag is high, then force the system to reset
+  if (softReset) {
+    stopTimers();
+    setup();
+    NVIC_SystemReset();
+    return;
+  }
   // blinkInit();
 
   // section("Frame: SLEEP", C_ORANGE);
@@ -26,41 +35,164 @@ void sleep(struct State * state)
   // Start RX Mode
   receiver();
 
+  // Deal with LED control
+  setLed(LED_AUX,MODE_OFF);
+  setLed(LED_RED,MODE_OFF);
+  setLed(LED_BLUE,MODE_OFF);
+  setLed(LED_GREEN,MODE_OFF);
+
+  digitalWrite(LED_PIN, LOW);
+  digitalWrite(BOARD_RGB_RED, LOW);
+  digitalWrite(BOARD_RGB_GREEN, LOW);
+  digitalWrite(BOARD_RGB_BLUE, LOW);
+
+  milliTimer = millis();
+
   pcln("Setting Flags");
   post_rb = false;
   bcst_blocks = 0;
+  com_acpt_blocks = 0;
+  cycle_counter++;
 
   // Set the default next state
   state->next = sleep_loop;
 
+  // If we are the base, make some exceptions to the transmit rules
   if (cycleValid <= 0 && isBase) {
     cycleStart = micros();
     cycleValid = 10;
+  }
+  if (transmitAuthorization <= 0 && isBase) {
+    transmitAuthorization = TRANSMIT_AUTH_CAP;
   }
 
   // If our cycle is valid here at the start of sleep, then go ahead and set our
   // sleep timeout. Otherwise we will have to wait until we can validate it
   // later.
-  if (cycleValid > 0) {
+  if (cycleValid > 0 && transmitAuthorization > 0) {
     sprintf(medium_buf, "Cycle Valid: %d", cycleValid); pcln(medium_buf);
-
     sprintf(medium_buf, "Old Cycle Start: %d", cycleStart); pcln(medium_buf);
 
     // Step the cycle start forward
     cycleStart += settings.t_c;
 
     sprintf(medium_buf, "New Cycle Start: %d", cycleStart); pcln(medium_buf);
-
     sprintf(medium_buf, "Now: %d", micros()); pcln(medium_buf);
 
+    if (!isBase) {
+      byte temp = 0;
+      byte vbat = 0;
+      DW1000.getTempAndVbatByte(temp, vbat);
+
+      int heading = 0xFFFF;
+
+      if (magEnabled) {
+        sensors_event_t event; 
+        mag.getEvent(&event);
+        heading = (int) ((atan2(event.magnetic.z,event.magnetic.x) * 180) / 3.14159f);
+        if (heading < 0) {
+          heading = 360 + heading;
+        }
+      }
+
+      stats_msg sm = {.from = nodeNumber, .seq = getMsgSeq(), .hops = ALLOWABLE_HOPS, .bat = getBattVoltageBits(), .temp = temp, .heading = heading};
+      if (!putPacketInBuffer((various_msg *)&sm, STATUS_PACKET)) {
+        pcln("Packet Buffer Full. Overwrote Message", C_RED);
+      }
+    }
+
     setFrameTimer(settings.t_fs, cycleStart, true);
+
+    setLed(LED_BLUE, MODE_OFF);
+    setLed(LED_GREEN,MODE_CHIRP);
+  } else {
+    setLed(LED_BLUE, MODE_BLINK);
   }
 
+  // Decrement our cycle valid
   cycleValid --;
   if (cycleValid < 0)
     cycleValid = 0;
 
+  // Decrement our transmit authorization
+  transmitAuthorization --;
+  if (transmitAuthorization < 0)
+    transmitAuthorization = 0;
+
   sprintf(medium_buf, "Cycle Valid Value: %d", cycleValid); pcln(medium_buf);
+  sprintf(medium_buf, "Transmit Authorization Value: %d", transmitAuthorization); pcln(medium_buf);
+
+
+  // If we are are the base station, then we want to serial all of our 
+  // data out
+  if (isBase) {
+
+    // Build our cycle's transmit authorization message
+    cmd_msg cm = {.seq = getMsgSeq(), .cmd_id = COM_TRANSMIT_AUTH, .hops = ALLOWABLE_HOPS, .data = 0};
+    memcpy(&cmd_buffer[0], (various_msg *)&cm, sizeof(various_msg));
+    cmd_buffer_len = 1;
+
+    if (Serial5 && Serial5.available()) {
+      while(Serial5.available())
+        Serial5.read();
+
+      Serial5.println("Queueing Sleep Command!!");
+
+      cmd_msg rstcmd = {.seq = getMsgSeq(), .cmd_id = SOFT_RESET, .hops = ALLOWABLE_HOPS, .data = 0};
+      memcpy(&cmd_buffer[cmd_buffer_len], (various_msg *)&rstcmd, sizeof(various_msg));
+      cmd_buffer_len ++;
+
+      softReset = true;
+    }
+    
+
+    // Print out our incomming messages
+    various_msg packet;
+    uint8_t packet_id;
+    while (getPacketFromBuffer(&packet, &packet_id)) {
+      switch(packet_id) {
+        case RANGE_PACKET:
+          {
+            range_msg * msg = (range_msg *) &packet; 
+            
+            Serial5.print("Range Packet | Cycle:"); Serial5.print(cycle_counter);
+            Serial5.print(",\tFrom:"); Serial5.print(msg -> from);
+            Serial5.print(",\tTo:"); Serial5.print(msg -> to);
+            Serial5.print(",\tSeq:"); Serial5.print(msg -> seq);
+            Serial5.print(",\tHops:"); Serial5.print(msg -> hops);
+            Serial5.print(",\tRange:"); Serial5.println(msg -> range);
+          }
+          break;
+        case STATUS_PACKET:
+          {
+            stats_msg * msg = (stats_msg *) &packet; 
+            
+            Serial5.print("Stats Packet | Cycle:"); Serial5.print(cycle_counter);
+            Serial5.print(",\tFrom:"); Serial5.print(msg->from); 
+            Serial5.print(",\t\tSeq:"); Serial5.print(msg->seq); 
+            Serial5.print(",\tHops:"); Serial5.print(msg->hops);
+            Serial5.print(",\tBat:"); Serial5.print(msg->bat * BATT_MEAS_COEFF);
+            Serial5.print(",\tTemp:"); Serial5.print(DW1000.convertTemp(msg->temp));
+            Serial5.print(",\tHeading:"); Serial5.println(msg->heading);
+          }
+          break;
+        default:
+          Serial5.print("Unknown Packet Type: "); Serial5.println(packet_id);
+          break;
+      }
+    }
+  }
+
+  /*
+  typedef struct stats_msg
+  {                      // 5 Bytes
+    uint8_t from : 4;    // Node ID of the originating node
+    uint8_t seq : 5; // Unique message number
+    uint8_t hops : 3;    // Total allowed remaining hops for this message
+    uint16_t bat : 8;    // Raw battery voltage value
+    uint16_t heading : 9; // Raw heading value
+    int pad : 11;        // Extra padding to make 5 byte aligned
+  } stats_msg;*/
 
   // #ifdef DEBUG
   // endSection();
@@ -110,7 +242,10 @@ void sleep_decode(struct State * state)
 
   // Get the message from the DW1000 and parse it
   rxMessage = getMessage();
-  if (rxMessage.valid) {
+  processMessage(rxMessage);
+
+  if (rxMessage.valid)
+  {
 
     printMessage(rxMessage);
 
@@ -118,8 +253,8 @@ void sleep_decode(struct State * state)
     boolean adjusted = adjustClock(rxMessage, rxTimeM0, rxTimeDW.getAsMicroSeconds());
 
     // If we did adjust our clock, then we should set (or reset) our frame
-    // callback
-    if (adjusted) {
+    // callback if it is authorized
+    if (adjusted && cycleValid > 0 && transmitAuthorization > 0) {
       pcln("Adjusted clock. Setting new frame timer", C_BLUE);
       setFrameTimer(settings.t_fs, cycleStart, true);
     }
@@ -252,6 +387,7 @@ void ra_decode(struct State * state)
 
   // Message temp value
   rxMessage = getMessage();
+  processMessage(rxMessage);
 
   sprintf(medium_buf, "Rx @:  %lu", rxTimeM0); pcln(medium_buf);
 
@@ -355,6 +491,9 @@ void ra_resp(struct State * state)
   // Set the message data length to 0 (empty message)
   txMessage.len = 0;
 
+  // Load any data into this range response
+  loadPackets(&txMessage);
+
   // get the length of the full message (data + MAC)
   uint8_t len = getMessageLength(txMessage);
 
@@ -390,9 +529,10 @@ void ra_resp_loop(struct State * state)
   // ***###TODO Do we need these here?
   // // Check our timers. If one of them fires, then our state will be set as
   // // needed, based on the values we pass in.
-  // if (checkTimers(state, com_frame_init, rb_range)) {
-  //   return;
-  // }
+  if (checkTimers(state, com_frame_init, rb_range)) {
+    dec();
+    return;
+  }
 
   if(checkTx()) {
     // DW1000.readSystemEventStatusRegister();
@@ -459,6 +599,9 @@ void rb_range(struct State * state)
 
   // Set the length of the message data to 0
   txMessage.len = 0;
+
+  // Load any data into this range request
+  loadPackets(&txMessage);
 
   // Get the full length of the message (data + MAC)
   uint8_t len = getMessageLength(txMessage);
@@ -613,6 +756,7 @@ void rb_decode(struct State * state)
 
   // Load the message into our rxMessage Object
   rxMessage = getMessage();
+  processMessage(rxMessage);
 
   sprintf(medium_buf, "Rx @:  %lu", rxTimeM0); pcln(medium_buf);
 
@@ -632,8 +776,11 @@ void rb_decode(struct State * state)
         if (rxMessage.from < settings.n) {
           DW1000Time rec;
           DW1000.getReceiveTimestamp(rec);
-          double dist = computeRange(rec, rxMessage.from);
-
+          float dist = computeRange(rec, rxMessage.from);
+          if(dist < 0){
+            pcln("Dist calculated as less than 0", C_RED);
+            dist = 0;
+          }
           setLed(LED_AUX, MODE_CHIRP);
 
           pcln("Message Type: Range RESP", C_PURPLE);
@@ -641,6 +788,12 @@ void rb_decode(struct State * state)
           sprintf(medium_buf, "| → Seq: %d", rxMessage.seq); pcln(medium_buf, C_PURPLE);
           sprintf(medium_buf, "| → Distance: %d", dist); pcln(medium_buf, C_PURPLE);
           Serial.println(dist);
+          // Store this range to the distance_meas array
+          // distance_meas[rxMessage.from] = dist;
+          range_msg rm = {.from = nodeNumber, .to = rxMessage.from, .seq = getMsgSeq(), .hops = ALLOWABLE_HOPS, .range = (uint32_t)(dist*1000.0)};
+          if (!putPacketInBuffer((various_msg *)&rm, RANGE_PACKET)) {
+            pcln("Packet Buffer Full. Overwrote Message", C_RED);
+          }
 
         } else {
           pcln("From ID Out Of Bounds", C_RED);
@@ -714,6 +867,9 @@ void com_frame_init(struct State * state)
 
   pcln("[State] COM_FRAME_INIT", C_ORANGE); inc();
 
+  if (isBase) {
+    ta_msg_seq = getMsgSeq();
+  }
 
   state->next = com_acpt;
 
@@ -734,6 +890,20 @@ void com_frame_init(struct State * state)
 void com_acpt(struct State * state)
 {
   pcln("[State] COM_ACPT", C_ORANGE); inc();
+  
+  com_acpt_blocks ++;
+
+  if (com_acpt_blocks > settings.n_com + 2) {
+    state->next = sleep;
+    dec();
+    return;
+  }
+
+  if (checkMillis(state)){ 
+    state->next = sleep;
+    dec();
+    return;
+  }
 
   // Set this block timer
   uint32_t delay = (settings.t_fs + settings.t_fr) + (settings.t_cl + settings.t_b + settings.t_rx) * nodeNumber + settings.t_bc * settings.n * bcst_blocks;
@@ -741,7 +911,6 @@ void com_acpt(struct State * state)
   boolean prompt = setBlockTimer(delay, micros());
   if (!prompt) {
     pcln("Behind Schedule (Block Timer). Moving state", C_RED);
-    post_rb = true;
     state->next = com_bcst;
     dec();
     return;
@@ -756,6 +925,13 @@ void com_acpt(struct State * state)
 }
 void com_acpt_loop(struct State * state)
 {
+
+  if (com_acpt_blocks > settings.n_com + 2) {
+    state->next = sleep;
+    dec();
+    return;
+  }
+
   // Check our timers. If one of them fires, then our state will be set as
   // needed, based on the values we pass in.
   if (checkTimers(state, sleep, com_bcst)) {
@@ -779,6 +955,7 @@ void com_decode(struct State * state)
 
   // Message temp value
   rxMessage = getMessage();
+  processMessage(rxMessage);
 
   sprintf(medium_buf, "Rx @:  %lu", rxTimeM0); pcln(medium_buf);
 
@@ -837,12 +1014,22 @@ void com_bcst(struct State * state)
 {
   pcln("[State] COM_BCST", C_ORANGE); inc();
 
+  if (com_acpt_blocks > settings.n_com + 2) {
+    state->next = sleep;
+    dec();
+    return;
+  }
+
+  if (checkMillis(state)){ 
+    dec();
+    return;
+  }
+
   // Set this block timer
   uint64_t delay = (settings.t_fs + settings.t_fr) + (settings.t_cl + settings.t_b + settings.t_rx) * nodeNumber + settings.t_bc * settings.n * bcst_blocks + settings.t_bc;
   boolean prompt = setBlockTimer(delay, micros());
   if (!prompt) {
     pcln("Behind Schedule (Block Timer). Moving state", C_RED);
-    post_rb = true;
     state->next = com_acpt;
     dec();
     return;
@@ -865,6 +1052,10 @@ void com_bcst(struct State * state)
 
   // Set the length of the message data to 0
   txMessage.len = 0;
+
+  // Load avaliable packets into the message
+  loadPackets(&txMessage);
+
 
   // txMessage.data = []; // TODO ##
 
@@ -901,6 +1092,21 @@ void com_bcst(struct State * state)
 }
 void com_bcst_loop(struct State * state)
 {
+
+  if (isBase) {
+    pcln("Except from bcast");
+    state->next = com_acpt;
+    dec();
+    bcst_blocks++;
+    return;
+  }
+
+  if (com_acpt_blocks > settings.n_com + 2) {
+    state->next = sleep;
+    dec();
+    return;
+  }
+  
   // Check our timers. If one of them fires, then our state will be set as
   // needed, based on the values we pass in.
   if (checkTimers(state, sleep, com_acpt)) {

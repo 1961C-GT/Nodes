@@ -3,24 +3,56 @@
 #include <DW1000.h>
 #include <M0Timer.h>
 #include "constants.h"
+#include <Adafruit_Sensor.h>
+#include <Adafruit_LSM303_U.h>
+
 // END IMPORTS
 
 // ========= Node IDs ========== //
 #define LEN_NODES_LIST 4
 constexpr uint16_t nodeList[] = {
+  0x2243, // BASE 1
   0x5DCB, // BASE 2
+  0x805C, // NODE 4
   // 0x6606, // NODE 1
   // 0xDC19, // NODE 3
   0xBFAA, // NODE 2
-  0x805C, // NODE 4
-  0x2243, // BASE 1
-  // 0xDEAD  // FILLER
+};
+constexpr Antenna_Delay antennaDelayList[] {
+    SHORT_ANTENNA, // BASE 1
+    SHORT_ANTENNA, // BASE 2
+    LONG_ANTENNA, // NODE 4
+    // SHORT_ANTENNA, // NODE 1
+    // SHORT_ANTENNA, // NODE 3
+    LONG_ANTENNA, // NODE 2
 };
 // ========= Node IDs ========== //
+
+uint32_t milliTimer;
+
+uint8_t msg_seq = 0;
+uint32_t cycle_counter;
+
+// True if we can send it
+uint32_t packet_sendable[LEN_NODES_LIST];
+
+// uint8_t range_array_pointer = 0;
+// range_msg range_array[MAX_RANGE_MESSAGES];
+
+uint8_t buffer_start = 0;
+uint8_t buffer_num = 0;
+various_msg packet_buffer[MAX_RANGE_MESSAGES];
+uint8_t packet_buffer_IDs[MAX_RANGE_MESSAGES];
+
+uint8_t ta_msg_seq = 0;
+uint8_t cmd_buffer_len = 0;
+various_msg cmd_buffer[MAX_CMD_MESSAGES];
 
 
 uint8_t nodeNumber;
 boolean isBase;
+
+boolean softReset;
 
 // Global Settings
 Settings settings;
@@ -66,10 +98,11 @@ volatile boolean blink;
 // Cycle Timing
 uint32_t cycleStart;
 int cycleValid;
+int transmitAuthorization;
+
 uint8_t lastSequenceNumber;
 uint8_t rangeRequestFrom;
 uint8_t rangeRequestSeq;
-boolean transmitAuthorization;
 
 // Timers
 boolean frameTimerSet;
@@ -81,6 +114,8 @@ volatile boolean rxFail;
 volatile boolean rxTimeout;
 uint8_t numClockErrors;
 
+Adafruit_LSM303_Mag_Unified mag = Adafruit_LSM303_Mag_Unified(12345);
+boolean magEnabled;
 
 void setup() {
 
@@ -88,6 +123,16 @@ void setup() {
   rxFail = false;
   rxTimeout = false;
   numClockErrors = 0;
+
+  msg_seq = 0;
+  ta_msg_seq = 0;
+  cmd_buffer_len = 0;
+  buffer_start = 0;
+  buffer_num = 0;
+  cycle_counter = 0;
+
+  magEnabled = false;
+
 
   // LED Timer
   M0Timer.setup(_LED_TIMER);
@@ -120,12 +165,20 @@ void setup() {
     .t_s     = 5000,  // Time for the sleep frame
   };
 
+  // Set all of our packets as sendable
+  for (int i = 0; i < LEN_NODES_LIST; i++) {
+    packet_sendable[i] = 0xFFFFFFFF;
+  }
+
   // Set up our cycle information vars
   cycleStart = 0;
   cycleValid = 0;
+  transmitAuthorization = 0;
+  softReset = false;
+
   lastSequenceNumber = 0;
 
-  transmitAuthorization = false;
+
 
   pinMode(LED_PIN, OUTPUT);
   pinMode(BOARD_RGB_RED, OUTPUT);
@@ -139,20 +192,20 @@ void setup() {
   // Start the serial interface
   Serial.begin(256000);
 
+
+
   // float r, g, b, t;
   // r = 0; g = 0; b = 0; t = 0;
 
 
   // setLed(LED_RED, MODE_RAMP);
-  while(!Serial);
+  // while(!Serial);
   // setLed(LED_RED, MODE_OFF);
-
 
   header("ASYC NODE", C_BLACK, BG_YELLOW);
   inc();
   // header("SLEEP FRAME", C_BLACK, BG_GREEN);
   // header("RANGE FRAME", C_WHITE, BG_RED);
-
 
 
   // pcln("Program Boot", BG_RED_C_WHITE);
@@ -213,8 +266,19 @@ void setup() {
   if (isBase)
   {
     setLed(LED_RED, MODE_RAMP);
+    Serial5.begin(256000);
     while (!Serial);
+    Serial5.println("Base Station Data Serial");
     setLed(LED_RED, MODE_OFF);
+
+    Serial.println(sizeof(various_msg));
+    Serial.println(sizeof(cmd_msg));
+    Serial.println(sizeof(stats_msg));
+  } else {
+    magEnabled = mag.begin();
+    if (!magEnabled) {
+      pcln("Mag Sensor Error!", BG_RED_C_WHITE);
+    }
   }
 // #endif
 
@@ -246,6 +310,9 @@ void setup() {
   DW1000.interruptOnTxPreambleSent(false);
   DW1000.interruptOnRxFrameStart(true);
   DW1000.interruptOnTxFrameStart(true);
+
+  // Set our antenna delay
+  DW1000.setAntennaDelay(antennaDelayList[nodeNumber]);
 
   // Commit the config to the DW1000
   DW1000.commitConfiguration();
@@ -319,6 +386,7 @@ void setup() {
   sprintf(medium_buf, "Network ID & Device Address: %s", msg); pcln(medium_buf);
   DW1000.getPrintableDeviceMode(msg);
   sprintf(medium_buf, "Device Mode: %s", msg); pcln(medium_buf);
+  sprintf(medium_buf, "Antenna Delay: %d", DW1000.getAntennaDelay()); pcln(medium_buf);
 
   endSection("Boot Success\n\r", C_GREEN);
 
@@ -363,9 +431,9 @@ void setup() {
   if (isBase) {
     // state = { rb_range };
     cycleValid = 10;
+    transmitAuthorization = 50;
     cycleStart = micros();
     lastSequenceNumber = 255;
-    transmitAuthorization = true;
   }
 
   // Reset indentation
@@ -487,7 +555,7 @@ void t_leds(uint8_t t) {
       led_updated[i] = false;
 
       // Set its time counter to 0
-      tlist[led] = 0;
+      // tlist[led] = 0;
     }
 
     // Manage this led
