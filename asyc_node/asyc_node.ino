@@ -3,6 +3,9 @@
 #include <DW1000.h>
 #include <M0Timer.h>
 #include "constants.h"
+#include <Adafruit_Sensor.h>
+#include <Adafruit_LSM303_U.h>
+
 // END IMPORTS
 
 // ========= Node IDs ========== //
@@ -14,15 +17,21 @@ constexpr uint16_t nodeList[] = {
   // 0x6606, // NODE 1
   // 0xDC19, // NODE 3
   0xBFAA, // NODE 2
-  
-
-    // 0xDEAD  // FILLER
+};
+constexpr Antenna_Delay antennaDelayList[] {
+    SHORT_ANTENNA, // BASE 1
+    SHORT_ANTENNA, // BASE 2
+    LONG_ANTENNA, // NODE 4
+    // SHORT_ANTENNA, // NODE 1
+    // SHORT_ANTENNA, // NODE 3
+    LONG_ANTENNA, // NODE 2
 };
 // ========= Node IDs ========== //
 
 uint32_t milliTimer;
 
 uint8_t msg_seq = 0;
+uint32_t cycle_counter;
 
 // True if we can send it
 uint32_t packet_sendable[LEN_NODES_LIST];
@@ -105,6 +114,8 @@ volatile boolean rxFail;
 volatile boolean rxTimeout;
 uint8_t numClockErrors;
 
+Adafruit_LSM303_Mag_Unified mag = Adafruit_LSM303_Mag_Unified(12345);
+boolean magEnabled;
 
 void setup() {
 
@@ -112,6 +123,16 @@ void setup() {
   rxFail = false;
   rxTimeout = false;
   numClockErrors = 0;
+
+  msg_seq = 0;
+  ta_msg_seq = 0;
+  cmd_buffer_len = 0;
+  buffer_start = 0;
+  buffer_num = 0;
+  cycle_counter = 0;
+
+  magEnabled = false;
+
 
   // LED Timer
   M0Timer.setup(_LED_TIMER);
@@ -154,7 +175,7 @@ void setup() {
   cycleValid = 0;
   transmitAuthorization = 0;
   softReset = false;
-  
+
   lastSequenceNumber = 0;
 
 
@@ -252,6 +273,12 @@ void setup() {
 
     Serial.println(sizeof(various_msg));
     Serial.println(sizeof(cmd_msg));
+    Serial.println(sizeof(stats_msg));
+  } else {
+    magEnabled = mag.begin();
+    if (!magEnabled) {
+      pcln("Mag Sensor Error!", BG_RED_C_WHITE);
+    }
   }
 // #endif
 
@@ -283,6 +310,9 @@ void setup() {
   DW1000.interruptOnTxPreambleSent(false);
   DW1000.interruptOnRxFrameStart(true);
   DW1000.interruptOnTxFrameStart(true);
+
+  // Set our antenna delay
+  DW1000.setAntennaDelay(antennaDelayList[nodeNumber]);
 
   // Commit the config to the DW1000
   DW1000.commitConfiguration();
@@ -356,6 +386,7 @@ void setup() {
   sprintf(medium_buf, "Network ID & Device Address: %s", msg); pcln(medium_buf);
   DW1000.getPrintableDeviceMode(msg);
   sprintf(medium_buf, "Device Mode: %s", msg); pcln(medium_buf);
+  sprintf(medium_buf, "Antenna Delay: %d", DW1000.getAntennaDelay()); pcln(medium_buf);
 
   endSection("Boot Success\n\r", C_GREEN);
 
@@ -524,7 +555,7 @@ void t_leds(uint8_t t) {
       led_updated[i] = false;
 
       // Set its time counter to 0
-      tlist[led] = 0;
+      // tlist[led] = 0;
     }
 
     // Manage this led

@@ -35,12 +35,24 @@ void sleep(struct State * state)
   // Start RX Mode
   receiver();
 
+  // Deal with LED control
+  setLed(LED_AUX,MODE_OFF);
+  setLed(LED_RED,MODE_OFF);
+  setLed(LED_BLUE,MODE_OFF);
+  setLed(LED_GREEN,MODE_OFF);
+
+  digitalWrite(LED_PIN, LOW);
+  digitalWrite(BOARD_RGB_RED, LOW);
+  digitalWrite(BOARD_RGB_GREEN, LOW);
+  digitalWrite(BOARD_RGB_BLUE, LOW);
+
   milliTimer = millis();
 
   pcln("Setting Flags");
   post_rb = false;
   bcst_blocks = 0;
   com_acpt_blocks = 0;
+  cycle_counter++;
 
   // Set the default next state
   state->next = sleep_loop;
@@ -67,9 +79,32 @@ void sleep(struct State * state)
     sprintf(medium_buf, "New Cycle Start: %d", cycleStart); pcln(medium_buf);
     sprintf(medium_buf, "Now: %d", micros()); pcln(medium_buf);
 
+    if (!isBase) {
+      byte temp = 0;
+      byte vbat = 0;
+      DW1000.getTempAndVbatByte(temp, vbat);
+
+      int heading = 0xFFFF;
+
+      if (magEnabled) {
+        sensors_event_t event; 
+        mag.getEvent(&event);
+        heading = (int) ((atan2(event.magnetic.z,event.magnetic.x) * 180) / 3.14159f);
+        if (heading < 0) {
+          heading = 360 + heading;
+        }
+      }
+
+      stats_msg sm = {.from = nodeNumber, .seq = getMsgSeq(), .hops = ALLOWABLE_HOPS, .bat = getBattVoltageBits(), .temp = temp, .heading = heading};
+      if (!putPacketInBuffer((various_msg *)&sm, STATUS_PACKET)) {
+        pcln("Packet Buffer Full. Overwrote Message", C_RED);
+      }
+    }
+
     setFrameTimer(settings.t_fs, cycleStart, true);
 
     setLed(LED_BLUE, MODE_OFF);
+    setLed(LED_GREEN,MODE_CHIRP);
   } else {
     setLed(LED_BLUE, MODE_BLINK);
   }
@@ -97,7 +132,7 @@ void sleep(struct State * state)
     memcpy(&cmd_buffer[0], (various_msg *)&cm, sizeof(various_msg));
     cmd_buffer_len = 1;
 
-    if (Serial5.available()) {
+    if (Serial5 && Serial5.available()) {
       while(Serial5.available())
         Serial5.read();
 
@@ -119,17 +154,26 @@ void sleep(struct State * state)
         case RANGE_PACKET:
           {
             range_msg * msg = (range_msg *) &packet; 
-
-            // Serial5.print(checkSequenceNumber(msg -> from, msg -> seq) ? "Pre True" : "Pre False");
-            // setSequenceNumber(msg -> from, msg -> seq);
-            // Serial5.print(checkSequenceNumber(msg -> from, msg -> seq) ? "Post True" : "Post False");
             
-            Serial5.print("Range Packet | From:"); Serial5.print(msg -> from);
-            Serial5.print(", To:"); Serial5.print(msg -> to);
-            Serial5.print(", Seq:"); Serial5.print(msg -> seq);
-            Serial5.print(", Hops:"); Serial5.print(msg -> hops);
-            Serial5.print(", Range:"); Serial5.println(msg -> range);
-
+            Serial5.print("Range Packet | Cycle:"); Serial5.print(cycle_counter);
+            Serial5.print(",\tFrom:"); Serial5.print(msg -> from);
+            Serial5.print(",\tTo:"); Serial5.print(msg -> to);
+            Serial5.print(",\tSeq:"); Serial5.print(msg -> seq);
+            Serial5.print(",\tHops:"); Serial5.print(msg -> hops);
+            Serial5.print(",\tRange:"); Serial5.println(msg -> range);
+          }
+          break;
+        case STATUS_PACKET:
+          {
+            stats_msg * msg = (stats_msg *) &packet; 
+            
+            Serial5.print("Stats Packet | Cycle:"); Serial5.print(cycle_counter);
+            Serial5.print(",\tFrom:"); Serial5.print(msg->from); 
+            Serial5.print(",\t\tSeq:"); Serial5.print(msg->seq); 
+            Serial5.print(",\tHops:"); Serial5.print(msg->hops);
+            Serial5.print(",\tBat:"); Serial5.print(msg->bat * BATT_MEAS_COEFF);
+            Serial5.print(",\tTemp:"); Serial5.print(DW1000.convertTemp(msg->temp));
+            Serial5.print(",\tHeading:"); Serial5.println(msg->heading);
           }
           break;
         default:
@@ -138,6 +182,17 @@ void sleep(struct State * state)
       }
     }
   }
+
+  /*
+  typedef struct stats_msg
+  {                      // 5 Bytes
+    uint8_t from : 4;    // Node ID of the originating node
+    uint8_t seq : 5; // Unique message number
+    uint8_t hops : 3;    // Total allowed remaining hops for this message
+    uint16_t bat : 8;    // Raw battery voltage value
+    uint16_t heading : 9; // Raw heading value
+    int pad : 11;        // Extra padding to make 5 byte aligned
+  } stats_msg;*/
 
   // #ifdef DEBUG
   // endSection();
@@ -475,6 +530,7 @@ void ra_resp_loop(struct State * state)
   // // Check our timers. If one of them fires, then our state will be set as
   // // needed, based on the values we pass in.
   if (checkTimers(state, com_frame_init, rb_range)) {
+    dec();
     return;
   }
 
@@ -869,7 +925,7 @@ void com_acpt(struct State * state)
 }
 void com_acpt_loop(struct State * state)
 {
-  
+
   if (com_acpt_blocks > settings.n_com + 2) {
     state->next = sleep;
     dec();

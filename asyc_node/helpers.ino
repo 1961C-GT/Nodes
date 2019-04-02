@@ -7,6 +7,7 @@ extern char *__brkval;
 
 #ifdef MNSLAC_NODE_M0
   float getBattVoltage() { return analogRead(BATT) * BATT_MEAS_COEFF; }
+  uint16_t getBattVoltageBits() { return analogRead(BATT); }
 #else
   float getBattVoltage() { return 0.0f; }
 #endif
@@ -167,10 +168,8 @@ boolean processSequenceNumber(uint8_t from, uint8_t seq) {
 }
 
 
-void processMessage(Message msg)
-{
-  if (msg.valid && msg.len == sizeof(com_stack)) 
-  {
+void processMessage(Message msg){
+  if (msg.valid && msg.len == sizeof(com_stack)) {
     com_stack *msg_com_stack = (com_stack *)msg.data;
     pcln("Decoded COM Stack", C_ORANGE);
     sprintf(medium_buf, "| → node_id: %u", msg_com_stack -> node_id); pcln(medium_buf);
@@ -201,7 +200,7 @@ void processMessage(Message msg)
           Serial5.print(", From: "); Serial5.print(rm->from); 
           Serial5.print(", To: "); Serial5.print(rm->to); 
           Serial5.print(", Hops: "); Serial5.print(rm->hops);
-          Serial5.print(", Sendable: "); Serial5.print(rm->hops);Serial5.print(packet_sendable[rm->from]); 
+          Serial5.print(", Sendable: "); Serial5.print(packet_sendable[rm->from]); 
           Serial5.println(")");
         } else {
           pcln("Range Packet Failed Seq or Hops", C_ORANGE);
@@ -215,7 +214,41 @@ void processMessage(Message msg)
         // memcpy(&range_array[range_array_pointer], rm, sizeof(range_msg));
         // packet_life
 
-      }else if (msg_com_stack->msg_id[i] == CMD_PACKET){
+      } else if (msg_com_stack->msg_id[i] == STATUS_PACKET){
+        stats_msg * sm = (stats_msg *)&msg_com_stack->msg[i];
+
+        if ((sm->hops > 0 || isBase) && sm->from != nodeNumber && processSequenceNumber(sm->from, sm->seq)) {
+          sm->hops --;
+
+          if (!putPacketInBuffer((various_msg *)sm, STATUS_PACKET)) {
+            pcln("Packet Buffer Full. Overwrote Message", C_RED);
+          }
+
+          sprintf(medium_buf, "Processed Stats Packet: %u", packet_sendable[sm->from]); pcln(medium_buf);
+          // sprintf(medium_buf, "| → From:  %u", sm -> from); pcln(medium_buf);
+          // sprintf(medium_buf, "| → Seq:   %u", sm -> seq); pcln(medium_buf);
+          // sprintf(medium_buf, "| → Hops:  %u", sm -> hops); pcln(medium_buf);
+          // sprintf(medium_buf, "| → Bat: %u", sm -> bat); pcln(medium_buf);
+          // sprintf(medium_buf, "| → Heading: %u", sm -> heading); pcln(medium_buf);
+          // sprintf(medium_buf, "| → Temp: %u", sm -> temp); pcln(medium_buf);
+
+        } 
+        
+        else if (isBase){
+          Serial5.print("Discarded Stats Packet due to Seq (Host: "); Serial5.print(msg.from); Serial5.println(")");
+        //   Serial5.print(", Seq: "); Serial5.print(sm->seq); 
+        //   Serial5.print(", From: "); Serial5.print(sm->from); 
+        //   Serial5.print(", Hops: "); Serial5.print(sm->hops);
+        //   Serial5.print(", Bat: "); Serial5.print(sm->bat);
+        //   Serial5.print(", Heading: "); Serial5.print(sm->heading);
+        //   Serial5.print(", Temp: "); Serial5.print(sm->temp);
+        //   Serial5.print(", Sendable: "); Serial5.print(packet_sendable[sm->from]); 
+        //   Serial5.println(")");
+        } else {
+          sprintf(medium_buf, "Stats Packet Failed Seq or Hops: %u", packet_sendable[sm->from]); pcln(medium_buf);
+        }
+        
+      } else if (msg_com_stack->msg_id[i] == CMD_PACKET) {
 
         // The base station does not relay or process command packets. Continue to
         // the next packet

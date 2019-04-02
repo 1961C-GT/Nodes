@@ -78,6 +78,13 @@ struct State
 };
 struct State;
 
+enum Antenna_Delay {
+  DWM_ANTENNA = 16384,
+  SHORT_ANTENNA = 16520,
+  LONG_ANTENNA = 16525,
+  BLADE_ANTENNA = 16587
+};
+
 //   MESSAGE FORMATS
 enum Msg_Type {
   ANNOUNCE = 0,
@@ -258,16 +265,20 @@ typedef struct range_msg
 } range_msg;
 #pragma pack(pop)
 
+#pragma pack(push, 1)
 typedef struct stats_msg
 {                      // 5 Bytes
   uint8_t from : 4;    // Node ID of the originating node
   uint8_t seq : 5; // Unique message number
   uint8_t hops : 3;    // Total allowed remaining hops for this message
-  uint16_t bat : 8;    // Raw battery voltage value
+  uint16_t bat : 10;    // Raw battery voltage value
+  uint16_t temp : 9;     // DW1000 Temp
   uint16_t heading : 9; // Raw heading value
-  int pad : 11;        // Extra padding to make 5 byte aligned
+  // int pad : 9;        // Extra padding to make 5 byte aligned
 } stats_msg;
+#pragma pack(pop)
 
+#pragma pack(push, 1)
 typedef struct cmd_msg
 {                      // 5 Bytes
   uint8_t seq : 5; // Unique message number
@@ -275,3 +286,4 @@ typedef struct cmd_msg
   uint8_t hops : 3;    // Total allowed remaining hops for this message
   uint32_t data : 27;  // Command data
 } cmd_msg;
+#pragma pack(pop)
