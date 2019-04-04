@@ -79,10 +79,21 @@ struct State
 };
 struct State;
 
+// LONG_ANTENNA: old 16525
+// 16495 Avg:3875
+// 16505 Avg:3877
+// 16555 Avg:3425
+// 16450 Avg:4399
+// 16470 Avg:4238
+// 16480 Avg:4144
+// 16482 Avg:4139
+// 16487 Avg:4048
+// 16484 Avg:4120
+
 enum Antenna_Delay {
   DWM_ANTENNA = 16384,
   SHORT_ANTENNA = 16520,
-  LONG_ANTENNA = 16525,
+  LONG_ANTENNA = 16484,
   BLADE_ANTENNA = 16587
 };
 

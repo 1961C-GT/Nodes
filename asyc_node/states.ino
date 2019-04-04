@@ -7,6 +7,11 @@ uint8_t bcst_blocks; // True when exited RB states. Reset in Sleep frame.
 uint8_t com_acpt_blocks; // True when exited RB states. Reset in Sleep frame.
 // ========================================================================== //
 
+double n = 0;
+double s = 0;
+double m = 0;
+double m_prev = 0;
+
 // ========================================================================== //
 // STATE: SLEEP
 //
@@ -164,26 +169,55 @@ void sleep(struct State * state)
             Serial5.print(",\tSeq:"); Serial5.print(msg -> seq);
             Serial5.print(",\tHops:"); Serial5.print(msg -> hops);
             Serial5.print(",\tRange:"); Serial5.println(msg -> range);
+
+            // int rng = msg->range;
+            //
+            // if (rng < 500 || rng > 500000) {
+            //   continue;
+            // }
+            //
+            // n ++;
+            // m_prev = m;
+            // m = m + (rng - m) / n;
+            // s = s + (rng - m) * (rng - m_prev);
+            //
+            // // runningAverage += (msg -> range);
+            // // measurement_counter++;
+            // Serial5.print("#: "); Serial5.print(n);
+            // Serial5.print(", R: "); Serial5.print(msg->range);
+            // Serial5.print(", Mean:"); Serial5.print(m);
+            // Serial5.print(", Var:"); Serial5.println(s/n);
           }
           break;
         case STATUS_PACKET:
           {
-            stats_msg * msg = (stats_msg *) &packet;
-
-            Serial5.print("Stats Packet | Cycle:"); Serial5.print(cycle_counter);
-            Serial5.print(",\tFrom:"); Serial5.print(msg->from);
-            Serial5.print(",\t\tSeq:"); Serial5.print(msg->seq);
-            Serial5.print(",\tHops:"); Serial5.print(msg->hops);
-            Serial5.print(",\tBat:"); Serial5.print(msg->bat * BATT_MEAS_COEFF);
-            Serial5.print(",\tTemp:"); Serial5.print(DW1000.convertTemp(msg->temp));
-            Serial5.print(",\tHeading:"); Serial5.println(msg->heading);
+            // stats_msg * msg = (stats_msg *) &packet;
+            //
+            // Serial5.print("Stats Packet | Cycle:"); Serial5.print(cycle_counter);
+            // Serial5.print(",\tFrom:"); Serial5.print(msg->from);
+            // Serial5.print(",\t\tSeq:"); Serial5.print(msg->seq);
+            // Serial5.print(",\tHops:"); Serial5.print(msg->hops);
+            // Serial5.print(",\tBat:"); Serial5.print(msg->bat * BATT_MEAS_COEFF);
+            // Serial5.print(",\tTemp:"); Serial5.print(DW1000.convertTemp(msg->temp));
+            // Serial5.print(",\tHeading:"); Serial5.println(msg->heading);
           }
           break;
         default:
-          Serial5.print("Unknown Packet Type: "); Serial5.println(packet_id);
+          // Serial5.print("Unknown Packet Type: "); Serial5.println(packet_id);
           break;
       }
     }
+
+    // // Limit ourselves to 500 cycles
+    // if (isBase && n > 250) {
+    //   Serial5.print("Test Complete. Mean:"); Serial5.print(m);
+    //   Serial5.print(", Var:"); Serial5.println(s/n);
+    //   setLed(LED_RED, MODE_BLINK);
+    //   while (1) {
+    //     delay(500);
+    //   }
+    // }
+
   }
 
   /*

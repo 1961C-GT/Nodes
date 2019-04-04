@@ -12,20 +12,24 @@
 #define LEN_NODES_LIST 6
 constexpr uint16_t nodeList[] = {
   0x2243, // BASE 1
+
   0x5DCB, // BASE 2
-  0x6606, // NODE 1
   0xBFAA, // NODE 2
   0xDC19, // NODE 3
   0x805C, // NODE 4
+
+  0x6606, // NODE 1
 };
 
 constexpr Antenna_Delay antennaDelayList[] {
-    LONG_ANTENNA, // BASE 1
+    SHORT_ANTENNA, // BASE 1
+
     LONG_ANTENNA, // BASE 2
-    SHORT_ANTENNA, // NODE 4
-    SHORT_ANTENNA, // NODE 1
+    LONG_ANTENNA, // NODE 2
     SHORT_ANTENNA, // NODE 3
-    SHORT_ANTENNA, // NODE 2
+    LONG_ANTENNA, // NODE 4
+
+    SHORT_ANTENNA, // NODE 1
 };
 // ========= Node IDs ========== //
 
@@ -33,6 +37,10 @@ uint32_t milliTimer;
 
 uint8_t msg_seq = 0;
 uint32_t cycle_counter;
+
+// TODO: Remove
+uint32_t runningAverage;
+uint32_t measurement_counter;
 
 // True if we can send it
 uint32_t packet_sendable[LEN_NODES_LIST];
@@ -131,8 +139,11 @@ void setup() {
   buffer_start = 0;
   buffer_num = 0;
   cycle_counter = 0;
+  measurement_counter = 0;
 
   magEnabled = false;
+
+  runningAverage = 0;
 
 
 
@@ -151,16 +162,16 @@ void setup() {
 
   // === Define some default settigs =========================================//
   settings = {
-    .mode    = DW1000.MODE_LONGDATA_RANGE_ACCURACY,
+    .mode    = DW1000.MODE_LONGDATA_RANGE_LOWPOWER,
     .channel = DW1000.CHANNEL_3,
 
     .n       = LEN_NODES_LIST,
     .t_rx    = 4000,  // Buffer time for changing rx/tx mode // 1000
-    .t_b     = 10000,  // Buffer time between all blocks // 1000
+    .t_b     = 3000,  // Buffer time between all blocks // 1000
 
-    .t_r     = 10000,  // Time between range responses - longer than range_resp // 4000
+    .t_r     = 4000,  // Time between range responses - longer than range_resp // 4000
                      //  message length (~3ms)
-    .n_com   = 3,     // Number of com frames per cycle
+    .n_com   = 1,     // Number of com frames per cycle
     .bits_c  = 16,    // Number of bits allowed in a com message
     .t_cl    = 3000,  // Time for a single com message - longer than com_msg
                      //  length
@@ -269,8 +280,8 @@ void setup() {
   {
     setLed(LED_RED, MODE_RAMP);
     Serial5.begin(256000);
-    // while (!Serial);
-    Serial5.println("Base Station Data Serial");
+    while (!Serial);
+    // Serial5.println("Base Station Data Serial");
     setLed(LED_RED, MODE_OFF);
 
     Serial.println(sizeof(various_msg));
