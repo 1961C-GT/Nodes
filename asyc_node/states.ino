@@ -71,6 +71,16 @@ void sleep(struct State * state)
     transmitAuthorization = TRANSMIT_AUTH_CAP;
   }
 
+  // Decrement our cycle valid
+  cycleValid --;
+  if (cycleValid < 0)
+    cycleValid = 0;
+
+  // Decrement our transmit authorization
+  transmitAuthorization --;
+  if (transmitAuthorization < 0)
+    transmitAuthorization = 0;
+
   // If our cycle is valid here at the start of sleep, then go ahead and set our
   // sleep timeout. Otherwise we will have to wait until we can validate it
   // later.
@@ -122,16 +132,6 @@ void sleep(struct State * state)
   } else {
     setLed(LED_BLUE, MODE_BLINK);
   }
-
-  // Decrement our cycle valid
-  cycleValid --;
-  if (cycleValid < 0)
-    cycleValid = 0;
-
-  // Decrement our transmit authorization
-  transmitAuthorization --;
-  if (transmitAuthorization < 0)
-    transmitAuthorization = 0;
 
   sprintf(medium_buf, "Cycle Valid Value: %d", cycleValid); pcln(medium_buf);
   sprintf(medium_buf, "Transmit Authorization Value: %d", transmitAuthorization); pcln(medium_buf);

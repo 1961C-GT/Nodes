@@ -296,8 +296,9 @@ void processMessage(Message msg){
 
                 validTime = true;
 
-                // Up our transmit authorization
+                // Up our transmit authorization and cycle valid status
                 transmitAuthorization = TRANSMIT_AUTH_CAP;
+                cycleValid = CYCLE_VALID_CAP;
               }
               break;
             case SOFT_RESET:
@@ -568,7 +569,7 @@ boolean adjustClock(Message msg, uint32_t m0rx, float dwrx, boolean confirmCycle
 
     // Because we have just confirmed our cycle, set cycleValid to true
     if (confirmCycle)
-      cycleValid = 5;
+      cycleValid = CYCLE_VALID_CAP;
 
     // Return true to denote a clock adjustment
     return true;

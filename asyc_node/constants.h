@@ -10,6 +10,7 @@
 #define LARGE_BUFFER_LEN 255
 
 #define TRANSMIT_AUTH_CAP 15
+#define CYCLE_VALID_CAP 5
 #define MAX_COM_ACPT 5
 #define MAX_VALID_DISTANCE 500 // in meters
 

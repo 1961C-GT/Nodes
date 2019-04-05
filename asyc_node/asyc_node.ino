@@ -12,13 +12,17 @@
 // ========= Node IDs ========== //
 #define LEN_NODES_LIST 2
 constexpr uint16_t nodeList[] = {
+  0x5DCB, // BASE 2
+
+  0x6606, // NODE 1
+
   0x2243, // BASE 1
 
-  0x5DCB, // BASE 2
-  0x6606, // NODE 1
   0xBFAA, // NODE 2
   0xDC19, // NODE 3
   0x805C, // NODE 4
+
+
 };
 
 constexpr Antenna_Delay antennaDelayList[] {
