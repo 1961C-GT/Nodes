@@ -116,9 +116,9 @@ boolean processSequenceNumber(uint8_t from, uint8_t seq) {
 
 
   if (ret) {
-    
+
     // If this sequence is sendable, then we should assume it will
-    // be sent. Mark this sequence as unsendable to prevent us from 
+    // be sent. Mark this sequence as unsendable to prevent us from
     // receiving any additional copies
     // packet_sendable[from] = packet_sendable[from] | (0x1 << seq);
     packet_sendable[from] = packet_sendable[from] & ~(0x1 << seq); // Set to false
@@ -127,7 +127,7 @@ boolean processSequenceNumber(uint8_t from, uint8_t seq) {
     // Clear (set to true) the opposite half of the packet sendable list to allow
     // new packets from this node to come in under different
     // sequence numbers
-    
+
     // 0b0000000////////////////000000001 idx 0
     // 0b00000000000000000000000000000001
     // 0b00000001111111111111111000000000
@@ -149,7 +149,7 @@ boolean processSequenceNumber(uint8_t from, uint8_t seq) {
     else if (seq <= 22) {
       packet_sendable[from] = packet_sendable[from] | (0x00007FFF >> (22 - seq));
       packet_sendable[from] = packet_sendable[from] | (0xFFFE0000 << (seq - 8));
-    } 
+    }
 
 
     // 0b0000000010000000//////////////// idx 23
@@ -195,12 +195,12 @@ void processMessage(Message msg){
           sprintf(medium_buf, "| → Range: %u", rm -> range); pcln(medium_buf);
 
         } else if (isBase){
-          Serial5.print("Discarded Range Packet due to Seq (Host: "); Serial5.print(msg.from); 
-          Serial5.print(", Seq: "); Serial5.print(rm->seq); 
-          Serial5.print(", From: "); Serial5.print(rm->from); 
-          Serial5.print(", To: "); Serial5.print(rm->to); 
+          Serial5.print("Discarded Range Packet due to Seq (Host: "); Serial5.print(msg.from);
+          Serial5.print(", Seq: "); Serial5.print(rm->seq);
+          Serial5.print(", From: "); Serial5.print(rm->from);
+          Serial5.print(", To: "); Serial5.print(rm->to);
           Serial5.print(", Hops: "); Serial5.print(rm->hops);
-          Serial5.print(", Sendable: "); Serial5.print(packet_sendable[rm->from]); 
+          Serial5.print(", Sendable: "); Serial5.print(packet_sendable[rm->from]);
           Serial5.println(")");
         } else {
           pcln("Range Packet Failed Seq or Hops", C_ORANGE);
@@ -232,22 +232,22 @@ void processMessage(Message msg){
           // sprintf(medium_buf, "| → Heading: %u", sm -> heading); pcln(medium_buf);
           // sprintf(medium_buf, "| → Temp: %u", sm -> temp); pcln(medium_buf);
 
-        } 
-        
+        }
+
         else if (isBase){
           Serial5.print("Discarded Stats Packet due to Seq (Host: "); Serial5.print(msg.from); Serial5.println(")");
-        //   Serial5.print(", Seq: "); Serial5.print(sm->seq); 
-        //   Serial5.print(", From: "); Serial5.print(sm->from); 
+        //   Serial5.print(", Seq: "); Serial5.print(sm->seq);
+        //   Serial5.print(", From: "); Serial5.print(sm->from);
         //   Serial5.print(", Hops: "); Serial5.print(sm->hops);
         //   Serial5.print(", Bat: "); Serial5.print(sm->bat);
         //   Serial5.print(", Heading: "); Serial5.print(sm->heading);
         //   Serial5.print(", Temp: "); Serial5.print(sm->temp);
-        //   Serial5.print(", Sendable: "); Serial5.print(packet_sendable[sm->from]); 
+        //   Serial5.print(", Sendable: "); Serial5.print(packet_sendable[sm->from]);
         //   Serial5.println(")");
         } else {
           sprintf(medium_buf, "Stats Packet Failed Seq or Hops: %u", packet_sendable[sm->from]); pcln(medium_buf);
         }
-        
+
       } else if (msg_com_stack->msg_id[i] == CMD_PACKET) {
 
         // The base station does not relay or process command packets. Continue to
@@ -270,21 +270,36 @@ void processMessage(Message msg){
           // Handle this command
           switch (cm->cmd_id) {
             case COM_TRANSMIT_AUTH:
+              {
+                sprintf(medium_buf, "| → Transmit Authorization Accepted"); pcln(medium_buf, C_GREEN);
 
-              sprintf(medium_buf, "| → Transmit Authorization Accepted"); pcln(medium_buf, C_GREEN);
+                // If our transmit authorization was zero, then we should clear the
+                // packet buffer before moving on (so that we don't send really old
+                // messages)
+                if (transmitAuthorization == 0) {
+                  // Clear the packet buffer
+                  clearPacketBuffer();
+                }
 
-              // If our transmit authorization was zero, then we should clear the 
-              // packet buffer before moving on (so that we don't send really old
-              // messages)
-              if (transmitAuthorization == 0) {
-                // Clear the packet buffer
-                clearPacketBuffer();
+                uint32_t dateData = cm->data;
+
+                uint8_t s = (uint8_t) (cm->data);
+                uint8_t m = (uint8_t) (cm->data >> 8);
+                uint8_t h = (uint8_t) (cm->data >> 16);
+
+                rtc.setSeconds(s);
+                rtc.setMinutes(m);
+                rtc.setHours(h);
+
+
+                sprintf(medium_buf, "| → Got Time: %02d:%02d:%02d", h, m, s); pcln(medium_buf, C_GREEN);
+
+                validTime = true;
+
+                // Up our transmit authorization
+                transmitAuthorization = TRANSMIT_AUTH_CAP;
               }
-
-              // Up our transmit authorization
-              transmitAuthorization = TRANSMIT_AUTH_CAP;
               break;
-            
             case SOFT_RESET:
               sprintf(medium_buf, "| → Soft Reset", cm -> cmd_id); pcln(medium_buf, D_BLINK_C_CYAN);
               softReset = true;
@@ -306,8 +321,16 @@ void processMessage(Message msg){
       }else{
         sprintf(medium_buf, "Unknown Packet Type: %u", msg_com_stack->msg_id[i]); pcln(medium_buf, C_RED);
       }
-    } 
+    }
   }
+}
+
+void printDate() {
+  Serial.print(rtc.getHours());
+  Serial.print(":");
+  Serial.print(rtc.getMinutes());
+  Serial.print(":");
+  Serial.println(rtc.getSeconds());
 }
 
 // typedef struct cmd_msg
@@ -423,7 +446,7 @@ uint8_t getBufferLength() {
 
 void clearPacketBuffer() {
   buffer_num = 0;
-  buffer_start = 0; 
+  buffer_start = 0;
 }
 
 boolean getPacketFromBuffer(various_msg * packet, uint8_t * id)
@@ -438,7 +461,7 @@ boolean getPacketFromBuffer(various_msg * packet, uint8_t * id)
   buffer_start++;
   if (buffer_start >= MAX_RANGE_MESSAGES)
     buffer_start = 0;
-  
+
   buffer_num--;
 
   return true;

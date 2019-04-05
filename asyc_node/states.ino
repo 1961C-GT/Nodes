@@ -75,6 +75,10 @@ void sleep(struct State * state)
   // sleep timeout. Otherwise we will have to wait until we can validate it
   // later.
   if (cycleValid > 0 && transmitAuthorization > 0) {
+
+    pcln("Current DateTime:");
+    printDate();
+
     sprintf(medium_buf, "Cycle Valid: %d", cycleValid); pcln(medium_buf);
     sprintf(medium_buf, "Old Cycle Start: %d", cycleStart); pcln(medium_buf);
 
@@ -108,6 +112,8 @@ void sleep(struct State * state)
 
     boolean prompt = setFrameTimer(settings.t_fs, cycleStart, true);
 
+    // DW1000.deepSleep();
+
     // If we change states now, then blink the green light
     if (!prompt)
       setLed(LED_GREEN,MODE_CHIRP);
@@ -136,7 +142,17 @@ void sleep(struct State * state)
   if (isBase) {
 
     // Build our cycle's transmit authorization message
-    cmd_msg cm = {.seq = getMsgSeq(), .cmd_id = COM_TRANSMIT_AUTH, .hops = ALLOWABLE_HOPS, .data = 0};
+
+    // 23-16 15----8 7---0
+    // Hours Minutes Hours
+    uint32_t timeData = 0;
+    timeData = timeData | rtc.getSeconds();
+    timeData = timeData | (rtc.getMinutes() << 8);
+    timeData = timeData | (rtc.getHours() << 16);
+
+    sprintf(medium_buf, "Sent Time %12X", timeData); pcln(medium_buf, C_GREEN);
+
+    cmd_msg cm = {.seq = getMsgSeq(), .cmd_id = COM_TRANSMIT_AUTH, .hops = ALLOWABLE_HOPS, .data = timeData};
     memcpy(&cmd_buffer[0], (various_msg *)&cm, sizeof(various_msg));
     cmd_buffer_len = 1;
 
@@ -251,6 +267,10 @@ void sleep_loop(struct State * state)
   // See if it is time to leave the sleep frame. The block state is set to the
   // sleep frame so that if it is set (incorrecly), we will not leave sleep mode
   if (checkTimers(state, range_frame_init, sleep)) {
+
+    // DW1000.spiWakeup();
+    receiver();
+
     setLed(LED_GREEN,MODE_CHIRP);
     // cycleStart = micros() - settings.t_fs;
     pcln("Timer Triggered", C_GREEN);

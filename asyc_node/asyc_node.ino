@@ -5,26 +5,26 @@
 #include "constants.h"
 #include <Adafruit_Sensor.h>
 #include <Adafruit_LSM303_U.h>
+#include <RTCZero.h>
 
 // END IMPORTS
 
 // ========= Node IDs ========== //
-#define LEN_NODES_LIST 6
+#define LEN_NODES_LIST 2
 constexpr uint16_t nodeList[] = {
   0x2243, // BASE 1
 
   0x5DCB, // BASE 2
+  0x6606, // NODE 1
   0xBFAA, // NODE 2
   0xDC19, // NODE 3
   0x805C, // NODE 4
-
-  0x6606, // NODE 1
 };
 
 constexpr Antenna_Delay antennaDelayList[] {
-    SHORT_ANTENNA, // BASE 1
+    SHORT_ANTENNA, // BASE 2
 
-    LONG_ANTENNA, // BASE 2
+    LONG_ANTENNA, // NODE 1
     LONG_ANTENNA, // NODE 2
     SHORT_ANTENNA, // NODE 3
     LONG_ANTENNA, // NODE 4
@@ -62,6 +62,7 @@ uint8_t nodeNumber;
 boolean isBase;
 
 boolean softReset;
+boolean validTime;
 
 // Global Settings
 Settings settings;
@@ -126,6 +127,9 @@ uint8_t numClockErrors;
 Adafruit_LSM303_Mag_Unified mag = Adafruit_LSM303_Mag_Unified(12345);
 boolean magEnabled;
 
+// Real time clock object
+RTCZero rtc;
+
 void setup() {
 
   clkErr = false;
@@ -145,7 +149,9 @@ void setup() {
 
   runningAverage = 0;
 
+  validTime = false;
 
+  initRTC();
 
   // LED Timer
   M0Timer.setup(_LED_TIMER);
@@ -287,6 +293,10 @@ void setup() {
     Serial.println(sizeof(various_msg));
     Serial.println(sizeof(cmd_msg));
     Serial.println(sizeof(stats_msg));
+
+    // Set the default time
+    rtc.setTime(13, 20, 13);
+
   } else {
     magEnabled = mag.begin();
     if (!magEnabled) {
@@ -507,6 +517,16 @@ uint16_t getShortAddress() {
   byte addr[] = {val4, val3, val2, val1, val8, val7, val6, val5};
 
   return val4*256+val3;
+}
+
+void initRTC() {
+  rtc.begin(); // initialize RTC
+
+  // Set the default time
+  rtc.setTime(0, 0, 0);
+
+  // Set the default date
+  rtc.setDate(1, 1, 2000);
 }
 
 // Handlers
