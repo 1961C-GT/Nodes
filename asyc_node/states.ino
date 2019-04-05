@@ -59,6 +59,9 @@ void sleep(struct State * state)
   com_acpt_blocks = 0;
   cycle_counter++;
 
+  if (cycle_counter % 5 == 0)
+    updateRTC();
+
   // Set the default next state
   state->next = sleep_loop;
 
@@ -70,16 +73,6 @@ void sleep(struct State * state)
   if (transmitAuthorization <= 0 && isBase) {
     transmitAuthorization = TRANSMIT_AUTH_CAP;
   }
-
-  // Decrement our cycle valid
-  cycleValid --;
-  if (cycleValid < 0)
-    cycleValid = 0;
-
-  // Decrement our transmit authorization
-  transmitAuthorization --;
-  if (transmitAuthorization < 0)
-    transmitAuthorization = 0;
 
   // If our cycle is valid here at the start of sleep, then go ahead and set our
   // sleep timeout. Otherwise we will have to wait until we can validate it
@@ -124,6 +117,16 @@ void sleep(struct State * state)
 
     // DW1000.deepSleep();
 
+    // Decrement our cycle valid
+    cycleValid --;
+    if (cycleValid < 0)
+      cycleValid = 0;
+
+    // Decrement our transmit authorization
+    transmitAuthorization --;
+    if (transmitAuthorization < 0)
+      transmitAuthorization = 0;
+
     // If we change states now, then blink the green light
     if (!prompt)
       setLed(LED_GREEN,MODE_CHIRP);
@@ -146,9 +149,9 @@ void sleep(struct State * state)
     // 23-16 15----8 7---0
     // Hours Minutes Hours
     uint32_t timeData = 0;
-    timeData = timeData | rtc.getSeconds();
-    timeData = timeData | (rtc.getMinutes() << 8);
-    timeData = timeData | (rtc.getHours() << 16);
+    timeData = timeData | sec;
+    timeData = timeData | (((uint32_t) min) << 8);
+    timeData = timeData | (((uint32_t) hour) << 16);
 
     sprintf(medium_buf, "Sent Time %12X", timeData); pcln(medium_buf, C_GREEN);
 

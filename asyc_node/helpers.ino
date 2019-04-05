@@ -291,6 +291,7 @@ void processMessage(Message msg){
                 rtc.setMinutes(m);
                 rtc.setHours(h);
 
+                min = m; sec = s; hour = h;
 
                 sprintf(medium_buf, "| → Got Time: %02d:%02d:%02d", h, m, s); pcln(medium_buf, C_GREEN);
 
@@ -327,11 +328,11 @@ void processMessage(Message msg){
 }
 
 void printDate() {
-  Serial.print(rtc.getHours());
+  Serial.print(hour);
   Serial.print(":");
-  Serial.print(rtc.getMinutes());
+  Serial.print(min);
   Serial.print(":");
-  Serial.println(rtc.getSeconds());
+  Serial.println(sec);
 }
 
 // typedef struct cmd_msg

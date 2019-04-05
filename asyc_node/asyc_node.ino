@@ -131,6 +131,10 @@ uint8_t numClockErrors;
 Adafruit_LSM303_Mag_Unified mag = Adafruit_LSM303_Mag_Unified(12345);
 boolean magEnabled;
 
+uint8_t min;
+uint8_t hour;
+uint8_t sec;
+
 // Real time clock object
 RTCZero rtc;
 
@@ -465,6 +469,8 @@ void setup() {
     lastSequenceNumber = 255;
   }
 
+  updateRTC();
+
   // Reset indentation
   rst();
 }
@@ -521,6 +527,12 @@ uint16_t getShortAddress() {
   byte addr[] = {val4, val3, val2, val1, val8, val7, val6, val5};
 
   return val4*256+val3;
+}
+
+void updateRTC() {
+  min = rtc.getMinutes();
+  hour = rtc.getHours();
+  sec = rtc.getSeconds();
 }
 
 void initRTC() {
