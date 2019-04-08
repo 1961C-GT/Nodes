@@ -313,6 +313,8 @@ void processMessage(Message msg){
 
                 sleepTime = (uint16_t) cm->data;
                 sleepCounter = SLEEP_CYCLE_DELAY;
+
+                sprintf(medium_buf, "| → Got Sleep Command (%d seconds from now)", sleepTime); pcln(medium_buf, D_BLINK_C_CYAN);
               }
               break;
             default:
@@ -352,6 +354,7 @@ void queueSleep(uint16_t delay) {
 void checkSleep() {
 
   if (sleepCounter > 0) {
+    sprintf(medium_buf, "Sleeping in %d cycle(s) (%d seconds)", sleepCounter, sleepTime); pcln(medium_buf, C_ORANGE);
     sleepCounter --;
   } else if (sleepCounter == 0) {
 
@@ -430,26 +433,10 @@ void enableWatchdog() {
 
 void updateTime(uint8_t h, uint8_t m, uint8_t s) {
 
-  // Turn off the watchdog timer
-  rtc.disableAlarm();
-
-  // set the new time
-  rtc.setSeconds(s);
-  rtc.setMinutes(m);
-  rtc.setHours(h);
-
-  // Grab the new epoch time
-  uint32_t epoch = rtc.getEpoch();
-
-  // Add our sleep time
-  epoch += WATCHDOG_INTERVAL;
-
-  // Set the alarm to the epoch time
-  rtc.setAlarmEpoch(epoch);
-
-  // Enable the alarm matched to hour, min, second
-  rtc.enableAlarm(rtc.MATCH_SS);
-
+  set_hour = h;
+  set_min = m;
+  set_sec = s;
+  clockUpdateReceived = true;
 }
 
 // Main protection watchdog callback function
@@ -458,10 +445,24 @@ void watchdogCallback() {
   if (__watchdog_last ==__watchdog_comp) {
     reset();
   } else {
+
     // Record what the watchdog value was this time to check against next time
     __watchdog_last = __watchdog_comp;
 
-    // Set the alarm to the epoch time
+    // Update the time if needed
+    if (clockUpdateReceived) {
+        clockUpdateReceived = false;
+
+        // Turn off the watchdog timer
+        rtc.disableAlarm();
+
+        // Set the new time
+        rtc.setSeconds(set_sec);
+        rtc.setMinutes(set_min);
+        rtc.setHours(set_hour);
+    }
+
+    // Set the alarm to the epoch time plus the watchdog interval
     rtc.setAlarmEpoch(rtc.getEpoch() + WATCHDOG_INTERVAL);
 
     // Enable the alarm matched to hour, min, second

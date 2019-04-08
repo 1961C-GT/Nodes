@@ -19,19 +19,15 @@ double m_prev = 0;
 state_fn sleep, sleep_loop, sleep_decode;
 void sleep(struct State * state)
 {
-
-  // Hold the watchdog off for another cycle;
-  holdWatchdog();
-
-  checkReset();
-  checkSleep();
-
-  // blinkInit();
-
-  // section("Frame: SLEEP", C_ORANGE);
   header("SLEEP FRAME", C_BLACK, BG_GREEN);
   pcln("[State] SLEEP_INIT", C_ORANGE);
   inc();
+
+  // Check for reset and sleep
+  checkReset();
+  checkSleep();
+
+
   // Make sure that we do not have any block or frame timers set. (which means
   // we will be stuck in sleep until one is set at some point)
   stopTimers();
@@ -158,6 +154,7 @@ void sleep(struct State * state)
     memcpy(&cmd_buffer[0], (various_msg *)&cm, sizeof(various_msg));
     cmd_buffer_len = 1;
 
+    // SUPER basic serial interface lol
     if (Serial5 && Serial5.available()) {
       while(Serial5.available())
         Serial5.read();
@@ -296,6 +293,7 @@ void sleep_loop(struct State * state)
 }
 void sleep_decode(struct State * state)
 {
+  holdWatchdog();
   // #ifdef DEBUG
   section("[state] SLEEP_DECODE", C_ORANGE);
   // pcln("Sleep Decode");
@@ -443,6 +441,7 @@ void ra_init_loop(struct State * state)
 state_fn ra_decode;
 void ra_decode(struct State * state)
 {
+  holdWatchdog();
   boolean changeState = false;
 
   section("[state] RA_DECODE", C_ORANGE);
@@ -822,6 +821,7 @@ void rb_rec_loop(struct State * state)
 state_fn rb_decode;
 void rb_decode(struct State * state)
 {
+  holdWatchdog();
   // blinkInit();
   section("[state] RB_DECODE", C_ORANGE);
 
@@ -1025,6 +1025,7 @@ void com_acpt_loop(struct State * state)
 }
 void com_decode(struct State * state)
 {
+  holdWatchdog();
   section("[state] COM_DECODE", C_ORANGE);
 
   // Set the defualt next state
@@ -1171,7 +1172,7 @@ void com_bcst_loop(struct State * state)
 {
 
   if (isBase) {
-    pcln("Except from bcast");
+    pcln("Excempt from bcast");
     state->next = com_acpt;
     dec();
     bcst_blocks++;

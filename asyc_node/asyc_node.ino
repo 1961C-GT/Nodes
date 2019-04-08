@@ -73,8 +73,8 @@ boolean softReset;
 boolean validTime;
 
 // watchdog Settings
-boolean __watchdog_comp;
-boolean __watchdog_last;
+volatile boolean __watchdog_comp;
+volatile boolean __watchdog_last;
 
 // Global Settings
 Settings settings;
@@ -91,8 +91,8 @@ volatile uint32_t rxTimeM0;
 volatile uint32_t txTimeM0;
 DW1000Time rxTimeDW;
 DW1000Time txTimeDW;
-volatile boolean txFlag = false;
-volatile boolean rxFlag = false;
+volatile boolean txFlag;
+volatile boolean rxFlag;
 void rxHandle() { rxTimeM0 = DW1000.getRxTime(); rxFlag = true; }
 void txHandle() { txTimeM0 = DW1000.getTxTime(); txFlag = true; /*Serial.write((uint8_t)116); Serial.println(txTimeM0);*/ }
 boolean checkRx() { if (rxFlag) { DW1000.getReceiveTimestamp(rxTimeDW); rxFlag = false; return true; } return false; }
@@ -143,6 +143,11 @@ uint8_t min;
 uint8_t hour;
 uint8_t sec;
 
+uint8_t set_min;
+uint8_t set_hour;
+uint8_t set_sec;
+volatile boolean clockUpdateReceived;
+
 // Real time clock object
 RTCZero rtc;
 
@@ -169,12 +174,18 @@ void setup() {
   sleepCounter = -1;
   sleepTime = 0;
 
+  rxFlag = false;
+  txFlag = false;
+
   initRTC();
 
   __watchdog_comp = false;
   __watchdog_last = false;
-  enableWatchdog();
   updateRTC();
+  set_min = 0;
+  set_hour = 0;
+  set_sec = 0;
+  clockUpdateReceived = false;
 
   // LED Timer
   M0Timer.setup(_LED_TIMER);
@@ -339,6 +350,9 @@ void setup() {
   DW1000.select(PIN_SS_BREAD);
 #endif
 
+  // Reset the DW1000 incase we were on before
+  DW1000.reset();
+
 
   // Start a new DW1000 Config
   DW1000.newConfiguration();
@@ -483,6 +497,9 @@ void setup() {
     cycleStart = micros();
     lastSequenceNumber = 255;
   }
+
+  // Start up the watchdog timer
+  enableWatchdog();
 
   // Reset indentation
   rst();
