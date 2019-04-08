@@ -174,18 +174,33 @@ void setup() {
 
   // === Define some default settigs =========================================//
   settings = {
+    // .mode    = DW1000.MODE_LONGDATA_RANGE_LOWPOWER,
+    // .channel = DW1000.CHANNEL_3,
+    //
+    // .n       = LEN_NODES_LIST,
+    // .t_rx    = 4000,  // Buffer time for changing rx/tx mode // 1000
+    // .t_b     = 3000,  // Buffer time between all blocks // 1000
+    //
+    // .t_r     = 4000,  // Time between range responses - longer than range_resp // 4000
+    //                  //  message length (~3ms)
+    // .n_com   = 1,     // Number of com frames per cycle
+    // .bits_c  = 16,    // Number of bits allowed in a com message
+    // .t_cl    = 3000,  // Time for a single com message - longer than com_msg
+    //                  //  length
+    // .t_s     = 5000,  // Time for the sleep frame
+
     .mode    = DW1000.MODE_LONGDATA_RANGE_LOWPOWER,
     .channel = DW1000.CHANNEL_3,
 
     .n       = LEN_NODES_LIST,
     .t_rx    = 4000,  // Buffer time for changing rx/tx mode // 1000
-    .t_b     = 3000,  // Buffer time between all blocks // 1000
+    .t_b     = 10000,  // Buffer time between all blocks // 1000
 
-    .t_r     = 4000,  // Time between range responses - longer than range_resp // 4000
+    .t_r     = 10000,  // Time between range responses - longer than range_resp // 4000
                      //  message length (~3ms)
-    .n_com   = 1,     // Number of com frames per cycle
+    .n_com   = 3,     // Number of com frames per cycle
     .bits_c  = 16,    // Number of bits allowed in a com message
-    .t_cl    = 3000,  // Time for a single com message - longer than com_msg
+    .t_cl    = 4000,  // Time for a single com message - longer than com_msg
                      //  length
     .t_s     = 5000,  // Time for the sleep frame
 

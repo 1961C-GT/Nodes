@@ -11,6 +11,9 @@
 #define LED_PIN 13
 #define MAC_LEN 3
 
+#define LOW_MEM_CUTOFF 256 // Number of bytes of free memory below which the
+                           // system will reboot during a watchdog cycle
+
 #define TRANSMIT_AUTH_CAP 15 // How many cycles a node can transmit without a new xmit auth
 #define TRANSMIT_AUTH_TIME_INTERVAL 50 // After how many cycles a RTC time correction is sent out
 #define CYCLE_VALID_CAP 5 // How many cycles a node can transmit without receiving any messages

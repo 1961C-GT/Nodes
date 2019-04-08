@@ -132,6 +132,9 @@ void handleSerial() {
   various_msg packet;
   uint8_t packet_id;
   while (getPacketFromBuffer(&packet, &packet_id)) {
+
+    continue;
+
     switch(packet_id) {
       case RANGE_PACKET:
         {
@@ -542,7 +545,7 @@ void updateTime(uint8_t h, uint8_t m, uint8_t s) {
 // Main protection watchdog callback function
 void watchdogCallback() {
   // If the watchdog value has not changed, then it is time to reset
-  if (__watchdog_last ==__watchdog_comp) {
+  if (freeMemory() < LOW_MEM_CUTOFF || __watchdog_last ==__watchdog_comp) {
     reset();
   } else {
 
