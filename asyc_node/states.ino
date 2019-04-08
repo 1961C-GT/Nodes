@@ -20,13 +20,12 @@ state_fn sleep, sleep_loop, sleep_decode;
 void sleep(struct State * state)
 {
 
-  // If our reset flag is high, then force the system to reset
-  if (softReset) {
-    stopTimers();
-    setup();
-    NVIC_SystemReset();
-    return;
-  }
+  // Hold the watchdog off for another cycle;
+  holdWatchdog();
+
+  checkReset();
+  checkSleep();
+
   // blinkInit();
 
   // section("Frame: SLEEP", C_ORANGE);
@@ -163,13 +162,19 @@ void sleep(struct State * state)
       while(Serial5.available())
         Serial5.read();
 
-      Serial5.println("Queueing Sleep Command!!");
+      Serial5.println("Queueing Reset Command!!");
 
-      cmd_msg rstcmd = {.seq = getMsgSeq(), .cmd_id = SOFT_RESET, .hops = ALLOWABLE_HOPS, .data = 0};
-      memcpy(&cmd_buffer[cmd_buffer_len], (various_msg *)&rstcmd, sizeof(various_msg));
-      cmd_buffer_len ++;
+      queueReset();
+    }
 
-      softReset = true;
+    if (Serial && Serial.available()) {
+      while(Serial.available())
+        Serial.read();
+
+      pcln("Queueing Sleep Command!!", C_ORANGE);
+
+      // TODO: Make this adjustable via the command line
+      queueSleep(60);
     }
 
 
@@ -253,6 +258,7 @@ void sleep(struct State * state)
   // #ifdef DEBUG
   // endSection();
   // section("Frame: SLEEP_LOOP");
+
   dec();
   pcln("[State] SLEEP_LOOP", C_ORANGE);
   inc();

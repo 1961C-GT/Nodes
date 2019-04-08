@@ -4,6 +4,8 @@
 
 #define MAC_LEN 3
 
+#define BAUD_RATE 256000
+
 #define TINY_BUFFER_LEN 12
 #define SMALL_BUFFER_LEN 80
 #define MEDIUM_BUFFER_LEN 120
@@ -37,6 +39,11 @@ char large_buf[LARGE_BUFFER_LEN];
 #define BOARD_RGB_BLUE 5
 
 #define MAX_STALL_TIME 2000
+
+#define SLEEP_CYCLE_DELAY 3
+#define MIN_SLEEP_TIME 3 // Min sleep time in seconds
+#define MAX_SLEEP_TIME 21600 // Max sleep time in seconds (6 hours)
+#define WATCHDOG_INTERVAL 10 // Watchdog callback interval in seconds
 
 // Coef for calculating the battery voltage from the BATT pin.
 // 3.31 / 1024.0 * 2 = 0.00646484375
@@ -208,6 +215,7 @@ enum Command_Id
 {
   COM_TRANSMIT_AUTH = 1,
   SOFT_RESET = 2,
+  SLEEP = 3,
 };
 
 #define DATA_LEN sizeof(com_stack)

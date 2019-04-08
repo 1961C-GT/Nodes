@@ -287,9 +287,7 @@ void processMessage(Message msg){
                 uint8_t m = (uint8_t) (cm->data >> 8);
                 uint8_t h = (uint8_t) (cm->data >> 16);
 
-                rtc.setSeconds(s);
-                rtc.setMinutes(m);
-                rtc.setHours(h);
+                updateTime(h,m,s);
 
                 min = m; sec = s; hour = h;
 
@@ -305,6 +303,17 @@ void processMessage(Message msg){
             case SOFT_RESET:
               sprintf(medium_buf, "| → Soft Reset", cm -> cmd_id); pcln(medium_buf, D_BLINK_C_CYAN);
               softReset = true;
+              break;
+            case SLEEP:
+              if (sleepCounter == -1) {
+
+                uint16_t seconds = (uint16_t) cm->data;
+
+                uint8_t min = seconds / 60;
+
+                sleepTime = (uint16_t) cm->data;
+                sleepCounter = SLEEP_CYCLE_DELAY;
+              }
               break;
             default:
               sprintf(medium_buf, "Unknown Command Id: %u", cm->cmd_id); pcln(medium_buf, C_RED);
@@ -325,6 +334,190 @@ void processMessage(Message msg){
       }
     }
   }
+}
+
+void queueReset() {
+  cmd_msg rstcmd = {.seq = getMsgSeq(), .cmd_id = SOFT_RESET, .hops = ALLOWABLE_HOPS, .data = 0};
+  memcpy(&cmd_buffer[cmd_buffer_len], (various_msg *)&rstcmd, sizeof(various_msg));
+  cmd_buffer_len ++;
+  softReset = true;
+}
+
+void queueSleep(uint16_t delay) {
+  cmd_msg rstcmd = {.seq = getMsgSeq(), .cmd_id = SLEEP, .hops = ALLOWABLE_HOPS, .data = delay};
+  memcpy(&cmd_buffer[cmd_buffer_len], (various_msg *)&rstcmd, sizeof(various_msg));
+  cmd_buffer_len ++;
+}
+
+void checkSleep() {
+
+  if (sleepCounter > 0) {
+    sleepCounter --;
+  } else if (sleepCounter == 0) {
+
+    // Constrain the sleepTime
+    if (sleepTime > MAX_SLEEP_TIME) {
+      sleepTime = MAX_SLEEP_TIME;
+    } else if (sleepTime < MIN_SLEEP_TIME) {
+      sleepTime = MIN_SLEEP_TIME;
+    }
+
+    // Grab the current epoch time
+    uint32_t epoch = rtc.getEpoch();
+
+    // Add our sleep time
+    epoch += sleepTime;
+
+    sprintf(medium_buf, "Sleeping for %d seconds (%d)", sleepTime, epoch); pcln(medium_buf, C_ORANGE);
+
+    // shut down the main watchdog timer
+    disableWatchdog();
+
+    // Set the alarm to the epoch time
+    rtc.setAlarmEpoch(epoch);
+
+    // Enable the alarm matched to hour, min, second
+    rtc.enableAlarm(rtc.MATCH_HHMMSS);
+
+    // Go into standby mode
+    standby();
+
+    // Reset the system
+    reset();
+
+    // // Start the main watchdog timer back up;
+    // enableWatchdog();
+    //
+    // // Update the RTC time after the sleep
+    // updateRTC();
+    //
+    // // Update flags
+    // transmitAuthorization = 0;
+    // cycleValid = 0;
+    // cycle_counter = 0;
+    //
+    // sprintf(medium_buf, "Sleep Compleate (%02d:%02d:%02d)", hour, min, sec); pcln(medium_buf, C_ORANGE);
+    //
+    // // Reset our cleep counter to disable sleep next time
+    // sleepCounter = -1;
+  }
+}
+
+// Disable the main protection watchdog timer
+void disableWatchdog() {
+  rtc.disableAlarm();
+  rtc.detachInterrupt();
+}
+
+// Enable the main protection watchdog timer
+void enableWatchdog() {
+
+  // Attach the watchdogCallback function
+  rtc.attachInterrupt(watchdogCallback);
+
+  // Grab the current epoch time
+  uint32_t epoch = rtc.getEpoch();
+
+  // Add our sleep time
+  epoch += WATCHDOG_INTERVAL;
+
+  // Set the alarm to the epoch time
+  rtc.setAlarmEpoch(epoch);
+
+  // Enable the alarm matched to hour, min, second
+  rtc.enableAlarm(rtc.MATCH_SS);
+}
+
+void updateTime(uint8_t h, uint8_t m, uint8_t s) {
+
+  // Turn off the watchdog timer
+  rtc.disableAlarm();
+
+  // set the new time
+  rtc.setSeconds(s);
+  rtc.setMinutes(m);
+  rtc.setHours(h);
+
+  // Grab the new epoch time
+  uint32_t epoch = rtc.getEpoch();
+
+  // Add our sleep time
+  epoch += WATCHDOG_INTERVAL;
+
+  // Set the alarm to the epoch time
+  rtc.setAlarmEpoch(epoch);
+
+  // Enable the alarm matched to hour, min, second
+  rtc.enableAlarm(rtc.MATCH_SS);
+
+}
+
+// Main protection watchdog callback function
+void watchdogCallback() {
+  // If the watchdog value has not changed, then it is time to reset
+  if (__watchdog_last ==__watchdog_comp) {
+    reset();
+  } else {
+    // Record what the watchdog value was this time to check against next time
+    __watchdog_last = __watchdog_comp;
+
+    // Set the alarm to the epoch time
+    rtc.setAlarmEpoch(rtc.getEpoch() + WATCHDOG_INTERVAL);
+
+    // Enable the alarm matched to hour, min, second
+    rtc.enableAlarm(rtc.MATCH_SS);
+  }
+}
+
+// Hold the watchdog off for another alarm rotation
+void holdWatchdog() {
+  // Only change the watchdog value if it hasnt changed since the last time
+  // the watchdog was fired
+  if (__watchdog_comp == __watchdog_last)
+    __watchdog_comp = !__watchdog_last;
+}
+
+void standby() {
+
+  // Stop all of the timers
+  stopTimers();
+
+  // Put the DW1000 to sleep
+  DW1000.deepSleep();
+
+  // Turn all of the LEDs off
+  setLed(LED_AUX, MODE_OFF);
+  setLed(LED_RED, MODE_OFF);
+  setLed(LED_GREEN, MODE_OFF);
+  setLed(LED_BLUE, MODE_OFF);
+
+  // Wait for the DW1000 to fully enter sleep mode
+  delay(10);
+
+  // Enter standby mode
+  rtc.standbyMode();
+
+  // Start the DW1000 back up
+  DW1000.spiWakeup();
+
+  // Wait for the DW1000 to boot up
+  delay(10);
+
+  // TODO Reset here?
+}
+
+void checkReset() {
+  // If our reset flag is high, then force the system to reset
+  if (softReset) {
+    reset();
+  }
+}
+
+void reset() {
+  stopTimers();
+  disableWatchdog();
+  // setup();
+  NVIC_SystemReset();
 }
 
 void printDate() {

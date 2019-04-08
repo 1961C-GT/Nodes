@@ -14,11 +14,13 @@
 constexpr uint16_t nodeList[] = {
   0x5DCB, // BASE 2
 
+  0xBFAA, // NODE 2
+
   0x6606, // NODE 1
 
   0x2243, // BASE 1
 
-  0xBFAA, // NODE 2
+
   0xDC19, // NODE 3
   0x805C, // NODE 4
 
@@ -65,8 +67,14 @@ various_msg cmd_buffer[MAX_CMD_MESSAGES];
 uint8_t nodeNumber;
 boolean isBase;
 
+int8_t sleepCounter = -1;
+uint16_t sleepTime = 0;
 boolean softReset;
 boolean validTime;
+
+// watchdog Settings
+boolean __watchdog_comp;
+boolean __watchdog_last;
 
 // Global Settings
 Settings settings;
@@ -158,8 +166,15 @@ void setup() {
   runningAverage = 0;
 
   validTime = false;
+  sleepCounter = -1;
+  sleepTime = 0;
 
   initRTC();
+
+  __watchdog_comp = false;
+  __watchdog_last = false;
+  enableWatchdog();
+  updateRTC();
 
   // LED Timer
   M0Timer.setup(_LED_TIMER);
@@ -217,7 +232,7 @@ void setup() {
   // digitalWrite(BOARD_RGB_BLUE, HIGH);
 
   // Start the serial interface
-  Serial.begin(256000);
+  Serial.begin(BAUD_RATE);
 
 
 
@@ -468,8 +483,6 @@ void setup() {
     cycleStart = micros();
     lastSequenceNumber = 255;
   }
-
-  updateRTC();
 
   // Reset indentation
   rst();
