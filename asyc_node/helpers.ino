@@ -97,6 +97,74 @@ Message getMessage(byte data[], uint8_t dataLength) {
   return msg;
 }
 
+// Handle command serial. only for the base station
+void handleSerial() {
+  if (!isBase)
+    return;
+
+  // Input Serial Command Structure
+  // ?R\n      -- Reset command
+  // ?S#####\n -- Sleep command (##### = time in seconds)
+  // ??\n      -- Reset the base station only 
+
+  // SUPER basic serial interface lol
+  if (Serial5 && Serial5.available()) {
+    while(Serial5.available())
+      Serial5.read();
+
+    Serial5.println("Queueing Reset Command!!");
+
+    queueReset();
+  }
+
+  if (Serial && Serial.available()) {
+    while(Serial.available())
+      Serial.read();
+
+    pcln("Queueing Sleep Command!!", C_ORANGE);
+
+    // TODO: Make this adjustable via the command line
+    queueSleep(60);
+  }
+
+
+  // Print out our incomming messages
+  various_msg packet;
+  uint8_t packet_id;
+  while (getPacketFromBuffer(&packet, &packet_id)) {
+    switch(packet_id) {
+      case RANGE_PACKET:
+        {
+          range_msg * msg = (range_msg *) &packet;
+
+          Serial5.print("Range Packet | Cycle:"); Serial5.print(cycle_counter);
+          Serial5.print(",\tFrom:"); Serial5.print(msg -> from);
+          Serial5.print(",\tTo:"); Serial5.print(msg -> to);
+          Serial5.print(",\tSeq:"); Serial5.print(msg -> seq);
+          Serial5.print(",\tHops:"); Serial5.print(msg -> hops);
+          Serial5.print(",\tRange:"); Serial5.println(msg -> range);
+        }
+        break;
+      case STATUS_PACKET:
+        {
+          // stats_msg * msg = (stats_msg *) &packet;
+          //
+          // Serial5.print("Stats Packet | Cycle:"); Serial5.print(cycle_counter);
+          // Serial5.print(",\tFrom:"); Serial5.print(msg->from);
+          // Serial5.print(",\t\tSeq:"); Serial5.print(msg->seq);
+          // Serial5.print(",\tHops:"); Serial5.print(msg->hops);
+          // Serial5.print(",\tBat:"); Serial5.print(msg->bat * BATT_MEAS_COEFF);
+          // Serial5.print(",\tTemp:"); Serial5.print(DW1000.convertTemp(msg->temp));
+          // Serial5.print(",\tHeading:"); Serial5.println(msg->heading);
+        }
+        break;
+      default:
+        // Serial5.print("Unknown Packet Type: "); Serial5.println(packet_id);
+        break;
+    }
+  }
+}
+
 
 // Returns true if we can send this sequence number (and thus
 // we should store it until our next bcast)
@@ -293,8 +361,6 @@ void processMessage(Message msg){
 
                 sprintf(medium_buf, "| → Got Time: %02d:%02d:%02d", h, m, s); pcln(medium_buf, C_GREEN);
 
-                validTime = true;
-
                 // Up our transmit authorization and cycle valid status
                 transmitAuthorization = TRANSMIT_AUTH_CAP;
                 cycleValid = CYCLE_VALID_CAP;
@@ -338,7 +404,29 @@ void processMessage(Message msg){
   }
 }
 
+void queueTransmitAuth() {
+  // Build our cycle's transmit authorization message
+  uint32_t timeData = 0;
+  timeData = timeData | sec;
+  timeData = timeData | (((uint32_t) min) << 8);
+  timeData = timeData | (((uint32_t) hour) << 16);
+
+  if (cmd_buffer_len >= MAX_CMD_MESSAGES) {
+    cmd_buffer_len = 0;
+    pcln("Cleared Command Buffer (Xmit Auth)", C_RED);
+  }
+
+  cmd_msg cm = {.seq = getMsgSeq(), .cmd_id = COM_TRANSMIT_AUTH, .hops = ALLOWABLE_HOPS, .data = timeData};
+  memcpy(&cmd_buffer[0], (various_msg *)&cm, sizeof(various_msg));
+  cmd_buffer_len ++;
+}
+
 void queueReset() {
+  if (cmd_buffer_len >= MAX_CMD_MESSAGES) {
+    cmd_buffer_len = 0;
+    pcln("Cleared Command Buffer (Reset)", C_RED);
+  }
+
   cmd_msg rstcmd = {.seq = getMsgSeq(), .cmd_id = SOFT_RESET, .hops = ALLOWABLE_HOPS, .data = 0};
   memcpy(&cmd_buffer[cmd_buffer_len], (various_msg *)&rstcmd, sizeof(various_msg));
   cmd_buffer_len ++;
@@ -346,6 +434,11 @@ void queueReset() {
 }
 
 void queueSleep(uint16_t delay) {
+  if (cmd_buffer_len >= MAX_CMD_MESSAGES) {
+    cmd_buffer_len = 0;
+    pcln("Cleared Command Buffer (Sleep)", C_RED);
+  }
+
   cmd_msg rstcmd = {.seq = getMsgSeq(), .cmd_id = SLEEP, .hops = ALLOWABLE_HOPS, .data = delay};
   memcpy(&cmd_buffer[cmd_buffer_len], (various_msg *)&rstcmd, sizeof(various_msg));
   cmd_buffer_len ++;
@@ -414,6 +507,9 @@ void disableWatchdog() {
 
 // Enable the main protection watchdog timer
 void enableWatchdog() {
+
+  __watchdog_comp = false;
+  __watchdog_last = false;
 
   // Attach the watchdogCallback function
   rtc.attachInterrupt(watchdogCallback);
@@ -519,14 +615,6 @@ void reset() {
   disableWatchdog();
   // setup();
   NVIC_SystemReset();
-}
-
-void printDate() {
-  Serial.print(hour);
-  Serial.print(":");
-  Serial.print(min);
-  Serial.print(":");
-  Serial.println(sec);
 }
 
 // typedef struct cmd_msg
@@ -1105,7 +1193,7 @@ boolean checkTimers(struct State * state, state_fn * frameState, state_fn * bloc
   }
 
   if (millis() - milliTimer > MAX_STALL_TIME) {
-    sprintf(medium_buf, "> Stall Timer Fired %lu", micros()); pcln(medium_buf);
+    sprintf(medium_buf, "> Stall Timer Fired (from checkTimers) %lu", micros()); pcln(medium_buf);
     state->next = sleep;
     cycleValid = 0;
     return true;

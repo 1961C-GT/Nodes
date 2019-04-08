@@ -7,11 +7,6 @@ uint8_t bcst_blocks; // True when exited RB states. Reset in Sleep frame.
 uint8_t com_acpt_blocks; // True when exited RB states. Reset in Sleep frame.
 // ========================================================================== //
 
-double n = 0;
-double s = 0;
-double m = 0;
-double m_prev = 0;
-
 // ========================================================================== //
 // STATE: SLEEP
 //
@@ -19,80 +14,80 @@ double m_prev = 0;
 state_fn sleep, sleep_loop, sleep_decode;
 void sleep(struct State * state)
 {
+  rst();
   header("SLEEP FRAME", C_BLACK, BG_GREEN);
   pcln("[State] SLEEP_INIT", C_ORANGE);
   inc();
-
-  // Check for reset and sleep
-  checkReset();
-  checkSleep();
-
 
   // Make sure that we do not have any block or frame timers set. (which means
   // we will be stuck in sleep until one is set at some point)
   stopTimers();
 
+  // reset our milli timer
+  milliTimer = millis();
+
   // Start RX Mode
   receiver();
 
-  // Deal with LED control
+  // Check for reset and sleep
+  checkReset();
+  checkSleep();
+
+  // Deal with LED control (write them all to low)
   setLed(LED_AUX,MODE_OFF);
   setLed(LED_RED,MODE_OFF);
   setLed(LED_BLUE,MODE_OFF);
   setLed(LED_GREEN,MODE_OFF);
-
   digitalWrite(LED_PIN, LOW);
   digitalWrite(BOARD_RGB_RED, LOW);
   digitalWrite(BOARD_RGB_GREEN, LOW);
   digitalWrite(BOARD_RGB_BLUE, LOW);
 
-  milliTimer = millis();
-
-  pcln("Setting Flags");
+  // Reset cycle flags
   post_rb = false;
   bcst_blocks = 0;
   com_acpt_blocks = 0;
   cycle_counter++;
 
+  // Every 5th cycle, we update the RTC
   if (cycle_counter % 5 == 0)
     updateRTC();
 
   // Set the default next state
   state->next = sleep_loop;
 
-  // If we are the base, make some exceptions to the transmit rules
-  if (cycleValid <= 0 && isBase) {
-    cycleStart = micros();
-    cycleValid = 10;
-  }
-  if (transmitAuthorization <= 0 && isBase) {
-    transmitAuthorization = TRANSMIT_AUTH_CAP;
+  // If we are the base...
+  if (isBase) {
+    // Go ahead and queue an xmit auth message to send to the network when
+    // we get going
+    queueTransmitAuth();
+
+    // Make come exceptions to the transmit rules for the base
+    if (cycleValid <= 0) {
+      cycleStart = micros();
+      cycleValid = 10;
+    }
+    if (transmitAuthorization <= 0) {
+      transmitAuthorization = TRANSMIT_AUTH_CAP;
+    }
   }
 
   // If our cycle is valid here at the start of sleep, then go ahead and set our
   // sleep timeout. Otherwise we will have to wait until we can validate it
   // later.
   if (cycleValid > 0 && transmitAuthorization > 0) {
-
-    pcln("Current DateTime:");
-    printDate();
-
-    sprintf(medium_buf, "Cycle Valid: %d", cycleValid); pcln(medium_buf);
-    sprintf(medium_buf, "Old Cycle Start: %d", cycleStart); pcln(medium_buf);
-
     // Step the cycle start forward
     cycleStart += settings.t_c;
 
-    sprintf(medium_buf, "New Cycle Start: %d", cycleStart); pcln(medium_buf);
-    sprintf(medium_buf, "Now: %d", micros()); pcln(medium_buf);
-
+    // If we are not the base station, then we want to send some information
+    // about battery and temperature to the network
     if (!isBase) {
       byte temp = 0;
       byte vbat = 0;
       DW1000.getTempAndVbatByte(temp, vbat);
 
+      // Get our current heading from the mag/acell sensor
       int heading = 0xFFFF;
-
       if (magEnabled) {
         sensors_event_t event;
         mag.getEvent(&event);
@@ -102,22 +97,23 @@ void sleep(struct State * state)
         }
       }
 
+      // Build and queue a status message
       stats_msg sm = {.from = nodeNumber, .seq = getMsgSeq(), .hops = ALLOWABLE_HOPS, .bat = getBattVoltageBits(), .temp = temp, .heading = heading};
       if (!putPacketInBuffer((various_msg *)&sm, STATUS_PACKET)) {
         pcln("Packet Buffer Full. Overwrote Message", C_RED);
       }
     }
 
+    // Set the frame timer for the sleep frame, now that we are valid and
+    // authorized
     boolean prompt = setFrameTimer(settings.t_fs, cycleStart, true);
 
-    // DW1000.deepSleep();
-
-    // Decrement our cycle valid
+    // Decrement our cycle valid value
     cycleValid --;
     if (cycleValid < 0)
       cycleValid = 0;
 
-    // Decrement our transmit authorization
+    // Decrement our transmit authorization value
     transmitAuthorization --;
     if (transmitAuthorization < 0)
       transmitAuthorization = 0;
@@ -125,141 +121,29 @@ void sleep(struct State * state)
     // If we change states now, then blink the green light
     if (!prompt)
       setLed(LED_GREEN,MODE_CHIRP);
-
     setLed(LED_BLUE, MODE_OFF);
-  } else {
+  }
+
+  // If we are ot valid or we do not have transmit authorization, then set
+  // the blue light to mode_blink
+  else {
     setLed(LED_BLUE, MODE_BLINK);
   }
 
+  // Print our current cycle valid and transmit authorization values
   sprintf(medium_buf, "Cycle Valid Value: %d", cycleValid); pcln(medium_buf);
   sprintf(medium_buf, "Transmit Authorization Value: %d", transmitAuthorization); pcln(medium_buf);
-
 
   // If we are are the base station, then we want to serial all of our
   // data out
   if (isBase) {
-
-    // Build our cycle's transmit authorization message
-
-    // 23-16 15----8 7---0
-    // Hours Minutes Hours
-    uint32_t timeData = 0;
-    timeData = timeData | sec;
-    timeData = timeData | (((uint32_t) min) << 8);
-    timeData = timeData | (((uint32_t) hour) << 16);
-
-    sprintf(medium_buf, "Sent Time %12X", timeData); pcln(medium_buf, C_GREEN);
-
-    cmd_msg cm = {.seq = getMsgSeq(), .cmd_id = COM_TRANSMIT_AUTH, .hops = ALLOWABLE_HOPS, .data = timeData};
-    memcpy(&cmd_buffer[0], (various_msg *)&cm, sizeof(various_msg));
-    cmd_buffer_len = 1;
-
-    // SUPER basic serial interface lol
-    if (Serial5 && Serial5.available()) {
-      while(Serial5.available())
-        Serial5.read();
-
-      Serial5.println("Queueing Reset Command!!");
-
-      queueReset();
-    }
-
-    if (Serial && Serial.available()) {
-      while(Serial.available())
-        Serial.read();
-
-      pcln("Queueing Sleep Command!!", C_ORANGE);
-
-      // TODO: Make this adjustable via the command line
-      queueSleep(60);
-    }
-
-
-    // Print out our incomming messages
-    various_msg packet;
-    uint8_t packet_id;
-    while (getPacketFromBuffer(&packet, &packet_id)) {
-      switch(packet_id) {
-        case RANGE_PACKET:
-          {
-            range_msg * msg = (range_msg *) &packet;
-
-            Serial5.print("Range Packet | Cycle:"); Serial5.print(cycle_counter);
-            Serial5.print(",\tFrom:"); Serial5.print(msg -> from);
-            Serial5.print(",\tTo:"); Serial5.print(msg -> to);
-            Serial5.print(",\tSeq:"); Serial5.print(msg -> seq);
-            Serial5.print(",\tHops:"); Serial5.print(msg -> hops);
-            Serial5.print(",\tRange:"); Serial5.println(msg -> range);
-
-            // int rng = msg->range;
-            //
-            // if (rng < 500 || rng > 500000) {
-            //   continue;
-            // }
-            //
-            // n ++;
-            // m_prev = m;
-            // m = m + (rng - m) / n;
-            // s = s + (rng - m) * (rng - m_prev);
-            //
-            // // runningAverage += (msg -> range);
-            // // measurement_counter++;
-            // Serial5.print("#: "); Serial5.print(n);
-            // Serial5.print(", R: "); Serial5.print(msg->range);
-            // Serial5.print(", Mean:"); Serial5.print(m);
-            // Serial5.print(", Var:"); Serial5.println(s/n);
-          }
-          break;
-        case STATUS_PACKET:
-          {
-            // stats_msg * msg = (stats_msg *) &packet;
-            //
-            // Serial5.print("Stats Packet | Cycle:"); Serial5.print(cycle_counter);
-            // Serial5.print(",\tFrom:"); Serial5.print(msg->from);
-            // Serial5.print(",\t\tSeq:"); Serial5.print(msg->seq);
-            // Serial5.print(",\tHops:"); Serial5.print(msg->hops);
-            // Serial5.print(",\tBat:"); Serial5.print(msg->bat * BATT_MEAS_COEFF);
-            // Serial5.print(",\tTemp:"); Serial5.print(DW1000.convertTemp(msg->temp));
-            // Serial5.print(",\tHeading:"); Serial5.println(msg->heading);
-          }
-          break;
-        default:
-          // Serial5.print("Unknown Packet Type: "); Serial5.println(packet_id);
-          break;
-      }
-    }
-
-    // // Limit ourselves to 500 cycles
-    // if (isBase && n > 250) {
-    //   Serial5.print("Test Complete. Mean:"); Serial5.print(m);
-    //   Serial5.print(", Var:"); Serial5.println(s/n);
-    //   setLed(LED_RED, MODE_BLINK);
-    //   while (1) {
-    //     delay(500);
-    //   }
-    // }
-
+    handleSerial();
   }
 
-  /*
-  typedef struct stats_msg
-  {                      // 5 Bytes
-    uint8_t from : 4;    // Node ID of the originating node
-    uint8_t seq : 5; // Unique message number
-    uint8_t hops : 3;    // Total allowed remaining hops for this message
-    uint16_t bat : 8;    // Raw battery voltage value
-    uint16_t heading : 9; // Raw heading value
-    int pad : 11;        // Extra padding to make 5 byte aligned
-  } stats_msg;*/
-
-  // #ifdef DEBUG
-  // endSection();
-  // section("Frame: SLEEP_LOOP");
-
+  // Move to the sleep loop state
   dec();
   pcln("[State] SLEEP_LOOP", C_ORANGE);
   inc();
-  // #endif
 }
 void sleep_loop(struct State * state)
 {
@@ -943,10 +827,6 @@ void com_frame_init(struct State * state)
   header("COM FRAME", C_BLACK, BG_YELLOW);
 
   pcln("[State] COM_FRAME_INIT", C_ORANGE); inc();
-
-  if (isBase) {
-    ta_msg_seq = getMsgSeq();
-  }
 
   state->next = com_acpt;
 

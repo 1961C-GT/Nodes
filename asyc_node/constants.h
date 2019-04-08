@@ -1,5 +1,8 @@
 #define DEBUG 50
 
+#define BLOCK_SERIAL_NODE false
+#define BLOCK_SERIAL_BASE true
+
 #define LED_PIN 13
 
 #define MAC_LEN 3
@@ -249,6 +252,8 @@ struct Settings {
   uint16_t t_cl   : 16; // Time for a single com message - longer than com_msg length
 
   uint32_t t_s;         // Time for the sleep frame
+  
+  int32_t power;        // Manual power to apply to the DW1000. 0=disabled
 
   // --- Calculated Settings (from given)
   uint32_t t_br;        // Total time for the each ranging block
