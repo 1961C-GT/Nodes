@@ -10,12 +10,11 @@
 // END IMPORTS
 
 // ========= Node IDs ========== //
-#define LEN_NODES_LIST 2
+#define LEN_NODES_LIST 3
 constexpr uint16_t nodeList[] = {
   0x5DCB, // BASE 2
 
   0xBFAA, // NODE 2
-
   0x6606, // NODE 1
 
   0x2243, // BASE 1
@@ -195,7 +194,6 @@ void setup() {
 
   // Start up the real time clock and get the current time
   initRTC();
-  rtc.setTime(13, 20, 13);
   updateRTC();
 
   // Set our LED Pinmodes to output
@@ -224,6 +222,9 @@ void setup() {
   if (nodeList[0] == ownAddress) {
     isBase = true;
     nodeNumber = 0;
+
+    // Set the RTC time
+    rtc.setTime(13, 20, 13);
   }
   // If we are not the first in the list, then search the nodeList for our
   // address

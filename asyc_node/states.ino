@@ -50,8 +50,10 @@ void sleep(struct State * state)
   cycle_counter++;
 
   // Every 5th cycle, we update the RTC
-  if (cycle_counter % 5 == 0)
-    updateRTC();
+  // if (cycle_counter % 5 == 0) {
+  //   updateRTC();
+  //   sprintf(medium_buf, "Current Time: %02d:%02d:%02d", hour, min, sec); pcln(medium_buf);
+  // }
 
   // Set the default next state
   state->next = sleep_loop;
@@ -59,8 +61,13 @@ void sleep(struct State * state)
   // If we are the base...
   if (isBase) {
     // Go ahead and queue an xmit auth message to send to the network when
-    // we get going
-    queueTransmitAuth();
+    // we get going. Only send a new time correction every 25 cycles
+    boolean sendTime = false; //cycle_counter % TRANSMIT_AUTH_TIME_INTERVAL == 0;
+    // if (sendTime) {
+    //   updateRTC();
+    //   sprintf(medium_buf, "Sending Time: %02d:%02d:%02d", hour, min, sec); pcln(medium_buf, C_GREEN);
+    // }
+    queueTransmitAuth(sendTime);
 
     // Make come exceptions to the transmit rules for the base
     if (cycleValid <= 0) {
@@ -883,6 +890,7 @@ void com_acpt(struct State * state)
 void com_acpt_loop(struct State * state)
 {
 
+  // If we have had too many com acpt blocks, then move on
   if (com_acpt_blocks > settings.n_com + 2) {
     state->next = sleep;
     dec();
@@ -972,6 +980,7 @@ void com_bcst(struct State * state)
 {
   pcln("[State] COM_BCST", C_ORANGE); inc();
 
+  // If we have had too many com acpt blocks, then move on
   if (com_acpt_blocks > settings.n_com + 2) {
     state->next = sleep;
     dec();
@@ -1051,14 +1060,15 @@ void com_bcst(struct State * state)
 void com_bcst_loop(struct State * state)
 {
 
-  if (isBase) {
-    pcln("Excempt from bcast");
-    state->next = com_acpt;
-    dec();
-    bcst_blocks++;
-    return;
-  }
+  // if (isBase) {
+  //   pcln("Excempt from bcast");
+  //   state->next = com_acpt;
+  //   dec();
+  //   bcst_blocks++;
+  //   return;
+  // }
 
+  // If we have had too many com acpt blocks, then move on
   if (com_acpt_blocks > settings.n_com + 2) {
     state->next = sleep;
     dec();
@@ -1074,6 +1084,7 @@ void com_bcst_loop(struct State * state)
     return;
   }
 
+  // Check if the TX maessage has sent
   if(checkTx()) {
     pcln("Sent Message", C_GREEN);
     state->next = com_acpt;

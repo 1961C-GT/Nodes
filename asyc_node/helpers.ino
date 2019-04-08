@@ -105,7 +105,7 @@ void handleSerial() {
   // Input Serial Command Structure
   // ?R\n      -- Reset command
   // ?S#####\n -- Sleep command (##### = time in seconds)
-  // ??\n      -- Reset the base station only 
+  // ??\n      -- Reset the base station only
 
   // SUPER basic serial interface lol
   if (Serial5 && Serial5.available()) {
@@ -349,17 +349,19 @@ void processMessage(Message msg){
                   clearPacketBuffer();
                 }
 
-                uint32_t dateData = cm->data;
+                if (cm->data != 0) {
+                  uint32_t dateData = cm->data;
 
-                uint8_t s = (uint8_t) (cm->data);
-                uint8_t m = (uint8_t) (cm->data >> 8);
-                uint8_t h = (uint8_t) (cm->data >> 16);
+                  uint8_t s = (uint8_t) (cm->data);
+                  uint8_t m = (uint8_t) (cm->data >> 8);
+                  uint8_t h = (uint8_t) (cm->data >> 16);
 
-                updateTime(h,m,s);
+                  updateTime(h,m,s);
 
-                min = m; sec = s; hour = h;
+                  min = m; sec = s; hour = h;
 
-                sprintf(medium_buf, "| → Got Time: %02d:%02d:%02d", h, m, s); pcln(medium_buf, C_GREEN);
+                  sprintf(medium_buf, "| → Got Time: %02d:%02d:%02d", h, m, s); pcln(medium_buf, C_GREEN);
+                }
 
                 // Up our transmit authorization and cycle valid status
                 transmitAuthorization = TRANSMIT_AUTH_CAP;
@@ -404,12 +406,14 @@ void processMessage(Message msg){
   }
 }
 
-void queueTransmitAuth() {
+void queueTransmitAuth(boolean sendTime) {
   // Build our cycle's transmit authorization message
   uint32_t timeData = 0;
-  timeData = timeData | sec;
-  timeData = timeData | (((uint32_t) min) << 8);
-  timeData = timeData | (((uint32_t) hour) << 16);
+  if (sendTime) {
+    timeData = timeData | sec;
+    timeData = timeData | (((uint32_t) min) << 8);
+    timeData = timeData | (((uint32_t) hour) << 16);
+  }
 
   if (cmd_buffer_len >= MAX_CMD_MESSAGES) {
     cmd_buffer_len = 0;

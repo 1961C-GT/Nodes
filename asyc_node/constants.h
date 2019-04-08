@@ -2,21 +2,18 @@
 
 #define BLOCK_SERIAL_NODE false
 #define BLOCK_SERIAL_BASE true
-
-#define LED_PIN 13
-
-#define MAC_LEN 3
-
 #define BAUD_RATE 256000
 
 #define TINY_BUFFER_LEN 12
 #define SMALL_BUFFER_LEN 80
 #define MEDIUM_BUFFER_LEN 120
 #define LARGE_BUFFER_LEN 255
+#define LED_PIN 13
+#define MAC_LEN 3
 
-#define TRANSMIT_AUTH_CAP 15
-#define CYCLE_VALID_CAP 5
-#define MAX_COM_ACPT 5
+#define TRANSMIT_AUTH_CAP 15 // How many cycles a node can transmit without a new xmit auth
+#define TRANSMIT_AUTH_TIME_INTERVAL 50 // After how many cycles a RTC time correction is sent out
+#define CYCLE_VALID_CAP 5 // How many cycles a node can transmit without receiving any messages
 #define MAX_VALID_DISTANCE 500 // in meters
 
 char tiny_buf[TINY_BUFFER_LEN];
@@ -252,7 +249,7 @@ struct Settings {
   uint16_t t_cl   : 16; // Time for a single com message - longer than com_msg length
 
   uint32_t t_s;         // Time for the sleep frame
-  
+
   int32_t power;        // Manual power to apply to the DW1000. 0=disabled
 
   // --- Calculated Settings (from given)
