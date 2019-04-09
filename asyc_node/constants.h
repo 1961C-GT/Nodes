@@ -46,7 +46,7 @@ char large_buf[LARGE_BUFFER_LEN];
 #define SLEEP_CYCLE_DELAY 3 // Number of cycles to wait before going to sleep
 #define RESET_CYCLE_DELAY 3 // Number of cycles to wait before resetting
 #define MIN_SLEEP_TIME 3 // Min sleep time in seconds
-#define MAX_SLEEP_TIME 21600 // Max sleep time in seconds (6 hours)
+#define MAX_SLEEP_TIME 36000 // Max sleep time in seconds (6 hours)
 #define WATCHDOG_INTERVAL 15 // Watchdog callback interval in seconds
 
 // Coef for calculating the battery voltage from the BATT pin.

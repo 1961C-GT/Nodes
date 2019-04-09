@@ -10,28 +10,26 @@
 // END IMPORTS
 
 // ========= Node IDs ========== //
-#define LEN_NODES_LIST 3
+#define LEN_NODES_LIST 6
 constexpr uint16_t nodeList[] = {
   0x2243, // BASE 1
   0xDC19, // NODE 3
   0x805C, // NODE 4
 
-  0x6606, // NODE 1
   0x5DCB, // BASE 2
   0xBFAA, // NODE 2
 
-
+  0x6606, // NODE 1
 };
 
 constexpr Antenna_Delay antennaDelayList[] {
     SHORT_ANTENNA, // BASE 2
-
     LONG_ANTENNA, // NODE 1
-    LONG_ANTENNA, // NODE 2
-    SHORT_ANTENNA, // NODE 3
-    LONG_ANTENNA, // NODE 4
+    SHORT_ANTENNA, // NODE 2
+    LONG_ANTENNA, // NODE 3
 
-    SHORT_ANTENNA, // NODE 1
+    LONG_ANTENNA, // NODE 4
+    LONG_ANTENNA, // NODE 1
 };
 // ========= Node IDs ========== //
 
@@ -190,10 +188,10 @@ void setup() {
     .channel = DW1000.CHANNEL_3,
 
     .n       = LEN_NODES_LIST,
-    .t_rx    = 4000,  // Buffer time for changing rx/tx mode // 1000
-    .t_b     = 10000,  // Buffer time between all blocks // 1000
+    .t_rx    = 2000,  // Buffer time for changing rx/tx mode // 1000
+    .t_b     = 2000,  // Buffer time between all blocks // 1000
 
-    .t_r     = 10000,  // Time between range responses - longer than range_resp // 4000
+    .t_r     = 9000,  // Time between range responses - longer than range_resp // 4000
                      //  message length (~3ms)
     .n_com   = 3,     // Number of com frames per cycle
     .bits_c  = 16,    // Number of bits allowed in a com message
