@@ -33,6 +33,9 @@ void sleep(struct State * state)
   checkReset();
   checkSleep();
 
+  // Print out how much free memory we currently have
+  sprintf(medium_buf, "Current Mem: ", freeMemory()); pcln(medium_buf);
+
   // Deal with LED control (write them all to low)
   setLed(LED_AUX,MODE_OFF);
   setLed(LED_RED,MODE_OFF);
@@ -88,28 +91,28 @@ void sleep(struct State * state)
 
     // If we are not the base station, then we want to send some information
     // about battery and temperature to the network
-    if (!isBase) {
-      byte temp = 0;
-      byte vbat = 0;
-      DW1000.getTempAndVbatByte(temp, vbat);
+    // if (!isBase) {
+    byte temp = 0;
+    byte vbat = 0;
+    DW1000.getTempAndVbatByte(temp, vbat);
 
-      // Get our current heading from the mag/acell sensor
-      int heading = 0xFFFF;
-      if (magEnabled) {
-        sensors_event_t event;
-        mag.getEvent(&event);
-        heading = (int) ((atan2(event.magnetic.z,event.magnetic.x) * 180) / 3.14159f);
-        if (heading < 0) {
-          heading = 360 + heading;
-        }
-      }
-
-      // Build and queue a status message
-      stats_msg sm = {.from = nodeNumber, .seq = getMsgSeq(), .hops = ALLOWABLE_HOPS, .bat = getBattVoltageBits(), .temp = temp, .heading = heading};
-      if (!putPacketInBuffer((various_msg *)&sm, STATUS_PACKET)) {
-        pcln("Packet Buffer Full. Overwrote Message", C_RED);
+    // Get our current heading from the mag/acell sensor
+    int heading = 0xFFFF;
+    if (magEnabled) {
+      sensors_event_t event;
+      mag.getEvent(&event);
+      heading = (int) ((atan2(event.magnetic.z,event.magnetic.x) * 180) / 3.14159f);
+      if (heading < 0) {
+        heading = 360 + heading;
       }
     }
+
+    // Build and queue a status message
+    stats_msg sm = {.from = nodeNumber, .seq = getMsgSeq(), .hops = ALLOWABLE_HOPS, .bat = getBattVoltageBits(), .temp = temp, .heading = heading};
+    if (!putPacketInBuffer((various_msg *)&sm, STATUS_PACKET)) {
+      pcln("Packet Buffer Full. Overwrote Message", C_RED);
+    }
+    // }
 
     // Set the frame timer for the sleep frame, now that we are valid and
     // authorized

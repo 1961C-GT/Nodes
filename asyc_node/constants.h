@@ -1,4 +1,4 @@
-#define DEBUG 50
+#define DEBUG 1
 
 #define BLOCK_SERIAL_NODE false
 #define BLOCK_SERIAL_BASE true
@@ -43,10 +43,11 @@ char large_buf[LARGE_BUFFER_LEN];
 
 #define MAX_STALL_TIME 2000
 
-#define SLEEP_CYCLE_DELAY 3
+#define SLEEP_CYCLE_DELAY 3 // Number of cycles to wait before going to sleep
+#define RESET_CYCLE_DELAY 3 // Number of cycles to wait before resetting
 #define MIN_SLEEP_TIME 3 // Min sleep time in seconds
 #define MAX_SLEEP_TIME 21600 // Max sleep time in seconds (6 hours)
-#define WATCHDOG_INTERVAL 10 // Watchdog callback interval in seconds
+#define WATCHDOG_INTERVAL 15 // Watchdog callback interval in seconds
 
 // Coef for calculating the battery voltage from the BATT pin.
 // 3.31 / 1024.0 * 2 = 0.00646484375

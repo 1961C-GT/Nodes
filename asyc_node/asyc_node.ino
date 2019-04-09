@@ -12,16 +12,13 @@
 // ========= Node IDs ========== //
 #define LEN_NODES_LIST 3
 constexpr uint16_t nodeList[] = {
-  0x5DCB, // BASE 2
-
-  0xBFAA, // NODE 2
-  0x6606, // NODE 1
-
   0x2243, // BASE 1
-
-
   0xDC19, // NODE 3
   0x805C, // NODE 4
+
+  0x6606, // NODE 1
+  0x5DCB, // BASE 2
+  0xBFAA, // NODE 2
 
 
 };
@@ -60,7 +57,7 @@ boolean isBase;
 
 int8_t sleepCounter;
 uint16_t sleepTime;
-boolean softReset;
+int8_t resetCounter;
 
 // watchdog Settings
 volatile boolean __watchdog_comp;
@@ -153,6 +150,7 @@ void setup() {
 
   magEnabled = false;
   sleepCounter = -1;
+  resetCounter = -1;
   sleepTime = 0;
 
   rxFlag = false;
@@ -167,7 +165,6 @@ void setup() {
   cycleStart = 0;
   cycleValid = 0;
   transmitAuthorization = 0;
-  softReset = false;
 
 
   DWOffset = 0; // DW1000Time(0, DW1000Time::MICROSECONDS);
@@ -204,7 +201,7 @@ void setup() {
                      //  length
     .t_s     = 5000,  // Time for the sleep frame
 
-    .power   = 0x1F1F1F1FL, // The manual transmit power
+    .power   = 0,// 0x1F1F1F1FL, // The manual transmit power
   };
 
   // Start up the real time clock and get the current time
@@ -229,7 +226,6 @@ void setup() {
 
   // Start the serial interface
   Serial.begin(BAUD_RATE);
-
   // Figure out what node number we are
   // First see if we are the first address in the node list. If we are, then we
   // are also the base station
@@ -286,6 +282,23 @@ void setup() {
 
   header("ASYC NODE", C_BLACK, BG_YELLOW);
   inc();
+
+  // Print details about our node number
+  section("System Boot");
+  sprintf(small_buf, "Own Address: %04X", ownAddress); pcln(small_buf);
+  sprintf(small_buf, " -> Node #%d", nodeNumber); pcln(small_buf);
+  if (isBase) {
+    sprintf(small_buf, " -> IS BASE", nodeNumber); pcln(small_buf, C_GREEN);
+  }
+  pcln("");
+
+
+  if (isBase) {
+    Serial5.begin(BAUD_RATE);
+    pcln("Serial5 INIT");
+  } else {
+    pcln("Serial5 Inactive");
+  }
 
   // Start up the Mag/Accel sensor. If it is not installed, then magEnabled
   // will be false
@@ -379,15 +392,6 @@ void setup() {
 
   t_r = DW1000Time(settings.t_rn, DW1000Time::MICROSECONDS);
   // =========================================================================//
-
-  // Print details about our node number
-  section("System Boot");
-  sprintf(small_buf, "Own Address: %04X", ownAddress); pcln(small_buf);
-  sprintf(small_buf, " -> Node #%d", nodeNumber); pcln(small_buf);
-  if (isBase) {
-    sprintf(small_buf, " -> IS BASE", nodeNumber); pcln(small_buf, C_GREEN);
-  }
-  pcln("");
 
   // Print details about our config
   char msg[128];

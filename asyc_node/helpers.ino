@@ -34,7 +34,6 @@ void printMessage(Message msg) {
   sprintf(medium_buf, "| → %-8s%d", "Seq: ", msg.seq); pcln(medium_buf);
   sprintf(medium_buf, "| → %-8s%s", "Type: ", MsgTypes[msg.type]); pcln(medium_buf);
   sprintf(medium_buf, "| → %-8s0x%.*X", "Data: ", msg.len, msg.data); pcln(medium_buf);
-  sprintf(medium_buf, "| → %-8s%d", "Mem: ", freeMemory()); pcln(medium_buf);
   dec();
 }
 
@@ -97,6 +96,18 @@ Message getMessage(byte data[], uint8_t dataLength) {
   return msg;
 }
 
+enum Serial_Command {
+  SERIAL_CMD_NULL = 255,
+  SERIAL_CMD_BLANK = 0,
+  SERIAL_CMD_RESET = 1,
+  SERIAL_CMD_RESET_BASE = 2,
+  SERIAL_CMD_SLEEP = 3,
+};
+uint8_t serial_cmd = SERIAL_CMD_NULL;
+uint32_t serial_data = 0;
+
+uint8_t serial_data_count = 0;
+
 // Handle command serial. only for the base station
 void handleSerial() {
   if (!isBase)
@@ -105,35 +116,88 @@ void handleSerial() {
   // Input Serial Command Structure
   // ?R\n      -- Reset command
   // ?S#####\n -- Sleep command (##### = time in seconds)
-  // ??\n      -- Reset the base station only
+  // ?*\n      -- Reset the base station only
 
   // SUPER basic serial interface lol
   if (Serial5 && Serial5.available()) {
-    while(Serial5.available())
-      Serial5.read();
+    while(Serial5.available()) {
+      int c = Serial5.read();
 
-    Serial5.println("Queueing Reset Command!!");
+      if (c == '?') {
+        // Start of a command. Move on to the next charactor
+        serial_cmd = SERIAL_CMD_BLANK;
+        serial_data_count = 0;
+        serial_data = 0;
+        continue;
+      } else if (c == '\n' || c == '\r') {
 
-    queueReset();
+        switch(serial_cmd) {
+          case SERIAL_CMD_RESET:
+            pcln("Queueing Reset");
+            queueReset();
+            break;
+          case SERIAL_CMD_RESET_BASE:
+            reset();
+            break;
+          case SERIAL_CMD_SLEEP:
+            if (serial_data_count == 5) {
+              sprintf(medium_buf, "Queueing %d second sleep", serial_data); pcln(medium_buf);
+              queueSleep(serial_data);
+            }
+            break;
+          default:
+            break;
+        }
+
+        serial_cmd = SERIAL_CMD_NULL;
+        continue;
+      }
+
+      switch (serial_cmd) {
+        case SERIAL_CMD_BLANK:
+          if (c == 'S') {
+            serial_cmd = SERIAL_CMD_SLEEP;
+          } else if (c == 'R') {
+            serial_cmd = SERIAL_CMD_RESET;
+          } else if (c == '*') {
+            serial_cmd = SERIAL_CMD_RESET_BASE;
+          } else {
+            serial_cmd = SERIAL_CMD_NULL;
+          }
+          break;
+        case SERIAL_CMD_RESET:
+        case SERIAL_CMD_RESET_BASE:
+          serial_cmd = SERIAL_CMD_NULL;
+          break;
+        case SERIAL_CMD_SLEEP:
+          if (serial_data_count > 4) {
+            break;
+          }
+          serial_data += (c - 48) * intPow(10, 4 - serial_data_count);
+          serial_data_count ++;
+          break;
+        default:
+          serial_cmd = SERIAL_CMD_NULL;
+          break;
+      }
+    }
   }
 
+  // Clear the Serial buffer
   if (Serial && Serial.available()) {
     while(Serial.available())
       Serial.read();
-
-    pcln("Queueing Sleep Command!!", C_ORANGE);
-
-    // TODO: Make this adjustable via the command line
-    queueSleep(60);
   }
-
 
   // Print out our incomming messages
   various_msg packet;
   uint8_t packet_id;
   while (getPacketFromBuffer(&packet, &packet_id)) {
 
-    continue;
+    if (!Serial5)
+      continue;
+
+    // continue;
 
     switch(packet_id) {
       case RANGE_PACKET:
@@ -150,15 +214,15 @@ void handleSerial() {
         break;
       case STATUS_PACKET:
         {
-          // stats_msg * msg = (stats_msg *) &packet;
-          //
-          // Serial5.print("Stats Packet | Cycle:"); Serial5.print(cycle_counter);
-          // Serial5.print(",\tFrom:"); Serial5.print(msg->from);
-          // Serial5.print(",\t\tSeq:"); Serial5.print(msg->seq);
-          // Serial5.print(",\tHops:"); Serial5.print(msg->hops);
-          // Serial5.print(",\tBat:"); Serial5.print(msg->bat * BATT_MEAS_COEFF);
-          // Serial5.print(",\tTemp:"); Serial5.print(DW1000.convertTemp(msg->temp));
-          // Serial5.print(",\tHeading:"); Serial5.println(msg->heading);
+          stats_msg * msg = (stats_msg *) &packet;
+
+          Serial5.print("Stats Packet | Cycle:"); Serial5.print(cycle_counter);
+          Serial5.print(",\tFrom:"); Serial5.print(msg->from);
+          Serial5.print(",\t\tSeq:"); Serial5.print(msg->seq);
+          Serial5.print(",\tHops:"); Serial5.print(msg->hops);
+          Serial5.print(",\tBat:"); Serial5.print(msg->bat * BATT_MEAS_COEFF);
+          Serial5.print(",\tTemp:"); Serial5.print(DW1000.convertTemp(msg->temp));
+          Serial5.print(",\tHeading:"); Serial5.println(msg->heading);
         }
         break;
       default:
@@ -166,6 +230,19 @@ void handleSerial() {
         break;
     }
   }
+}
+
+// 3 ^ 5;
+//
+// 3
+//
+
+int intPow(int x, int p) {
+  int ret = 1;
+  for (int i = 0; i < p; i++) {
+    ret *= x;
+  }
+  return ret;
 }
 
 
@@ -373,7 +450,7 @@ void processMessage(Message msg){
               break;
             case SOFT_RESET:
               sprintf(medium_buf, "| → Soft Reset", cm -> cmd_id); pcln(medium_buf, D_BLINK_C_CYAN);
-              softReset = true;
+              resetCounter = RESET_CYCLE_DELAY;
               break;
             case SLEEP:
               if (sleepCounter == -1) {
@@ -437,7 +514,7 @@ void queueReset() {
   cmd_msg rstcmd = {.seq = getMsgSeq(), .cmd_id = SOFT_RESET, .hops = ALLOWABLE_HOPS, .data = 0};
   memcpy(&cmd_buffer[cmd_buffer_len], (various_msg *)&rstcmd, sizeof(various_msg));
   cmd_buffer_len ++;
-  softReset = true;
+  resetCounter = RESET_CYCLE_DELAY;
 }
 
 void queueSleep(uint16_t delay) {
@@ -545,7 +622,7 @@ void updateTime(uint8_t h, uint8_t m, uint8_t s) {
 // Main protection watchdog callback function
 void watchdogCallback() {
   // If the watchdog value has not changed, then it is time to reset
-  if (freeMemory() < LOW_MEM_CUTOFF || __watchdog_last ==__watchdog_comp) {
+  if (false && (freeMemory() < LOW_MEM_CUTOFF || __watchdog_last ==__watchdog_comp)) {
     reset();
   } else {
 
@@ -612,7 +689,12 @@ void standby() {
 
 void checkReset() {
   // If our reset flag is high, then force the system to reset
-  if (softReset) {
+  if (resetCounter > 0) {
+    sprintf(medium_buf, "Resetting in %d cycle(s)", sleepCounter); pcln(medium_buf, C_ORANGE);
+    resetCounter --;
+  } else if (resetCounter == 0) {
+    resetCounter = -1;
+
     reset();
   }
 }
