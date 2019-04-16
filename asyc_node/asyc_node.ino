@@ -13,23 +13,21 @@
 #define LEN_NODES_LIST 6
 constexpr uint16_t nodeList[] = {
   0x2243, // BASE 1
+  0x5DCB, // BASE 2
+  0x6606, // NODE 1
+  0xBFAA, // NODE 2
   0xDC19, // NODE 3
   0x805C, // NODE 4
-
-  0x5DCB, // BASE 2
-  0xBFAA, // NODE 2
-
-  0x6606, // NODE 1
 };
 
 constexpr Antenna_Delay antennaDelayList[] {
-    SHORT_ANTENNA, // BASE 2
-    LONG_ANTENNA, // NODE 1
+    LONG_ANTENNA, // BASE 1
+    SHORT_ANTENNA, // NODE 4
+    LONG_ANTENNA, // BASE 2
+    SHORT_ANTENNA, // NODE 1
     SHORT_ANTENNA, // NODE 2
-    LONG_ANTENNA, // NODE 3
+    SHORT_ANTENNA, // NODE 3
 
-    LONG_ANTENNA, // NODE 4
-    LONG_ANTENNA, // NODE 1
 };
 // ========= Node IDs ========== //
 
@@ -169,21 +167,6 @@ void setup() {
 
   // === Define some default settigs =========================================//
   settings = {
-    // .mode    = DW1000.MODE_LONGDATA_RANGE_LOWPOWER,
-    // .channel = DW1000.CHANNEL_3,
-    //
-    // .n       = LEN_NODES_LIST,
-    // .t_rx    = 4000,  // Buffer time for changing rx/tx mode // 1000
-    // .t_b     = 3000,  // Buffer time between all blocks // 1000
-    //
-    // .t_r     = 4000,  // Time between range responses - longer than range_resp // 4000
-    //                  //  message length (~3ms)
-    // .n_com   = 1,     // Number of com frames per cycle
-    // .bits_c  = 16,    // Number of bits allowed in a com message
-    // .t_cl    = 3000,  // Time for a single com message - longer than com_msg
-    //                  //  length
-    // .t_s     = 5000,  // Time for the sleep frame
-
     .mode    = DW1000.MODE_LONGDATA_RANGE_LOWPOWER,
     .channel = DW1000.CHANNEL_3,
 
@@ -199,7 +182,24 @@ void setup() {
                      //  length
     .t_s     = 5000,  // Time for the sleep frame
 
-    .power   = 0,// 0x1F1F1F1FL, // The manual transmit power
+    .power   = 0x1F1F1F1FL, // The manual transmit power
+
+    // .mode    = DW1000.MODE_MAGIC, //DW1000.MODE_LONGDATA_RANGE_LOWPOWER,
+    // .channel = DW1000.CHANNEL_3,
+    //
+    // .n       = LEN_NODES_LIST,
+    // .t_rx    = 2000,  // Buffer time for changing rx/tx mode // 1000
+    // .t_b     = 2000,  // Buffer time between all blocks // 1000
+    //
+    // .t_r     = 4000,  // Time between range responses - longer than range_resp // 4000
+    //                  //  message length (~3ms)
+    // .n_com   = 3,     // Number of com frames per cycle
+    // .bits_c  = 16,    // Number of bits allowed in a com message
+    // .t_cl    = 4000,  // Time for a single com message - longer than com_msg
+    //                  //  length
+    // .t_s     = 5000,  // Time for the sleep frame
+    //
+    // .power   = 0,// 0x1F1F1F1FL, // The manual transmit power
   };
 
   // Start up the real time clock and get the current time
@@ -258,6 +258,7 @@ void setup() {
         sprintf(tiny_buf, "%04X", nodeList[i]);
         pcln(tiny_buf);
       }
+      setLed(LED_RED, MODE_BLINK);
 
       endSection("SYSTEM FAILURE", C_RED);
       // Kill The Program
@@ -336,6 +337,9 @@ void setup() {
   // Set our antenna delay
   DW1000.setAntennaDelay(antennaDelayList[nodeNumber]);
 
+  // Set our data rate to 850kBs
+  // DW1000.setDataRate(0x01);
+
   // Manually set the power
   if (settings.power != 0)
     DW1000.setManualPower(settings.power);
@@ -403,8 +407,33 @@ void setup() {
   sprintf(medium_buf, "Device Mode: %s", msg); pcln(medium_buf);
   sprintf(medium_buf, "Antenna Delay: %d", DW1000.getAntennaDelay()); pcln(medium_buf);
   sprintf(medium_buf, "Power Setting: %08X", DW1000.getManualPower()); pcln(medium_buf);
-  endSection("Boot Success\n\r", C_GREEN);
+
+  uint16_t dw1000_id = DW1000.getDeviceIdentifier();
+  // sprintf(medium_buf, "DW1000 ID %04X", dw1000_id); pcln(medium_buf);
+
+  if (dw1000_id == 0xFFFF) {
+    endSection("Boot Error\n\r", C_RED);
+  } else {
+    endSection("Boot Success\n\r", C_GREEN);
+  }
   printSettings(settings);
+
+  if (dw1000_id == 0xFFFF) {
+    while(!Serial);
+    sprintf(large_buf, "Error: DW1000 not detected (Node %04X)", ownAddress);
+    section(large_buf, C_RED);
+    // for (uint8_t i = 0; i < LEN_NODES_LIST; i++) {
+    //   sprintf(tiny_buf, "%04X", nodeList[i]);
+    //   pcln(tiny_buf);
+    // }
+
+    setLed(LED_RED, MODE_BLINK);
+
+    endSection("SYSTEM FAILURE", C_RED);
+    // Kill The Program
+    for (;;)
+      delay(1000);
+  }
 
   // Set up recieve mode
   DW1000.newReceive();
@@ -527,16 +556,16 @@ void clkErrHandler() {
 void t_block(uint8_t t)
 {
   uint32_t now = micros();
-  Serial.print("b");
-  Serial.println(now);
+  // Serial.print("b");
+  // Serial.println(now);
 }
 
 // Callback for the frame timer
 void t_frame(uint8_t t)
 {
   uint32_t now = micros();
-  Serial.print("f");
-  Serial.println(now);
+  // Serial.print("f");
+  // Serial.println(now);
 }
 
 // Set the given led to the given mode
@@ -691,12 +720,12 @@ void loop() {
   // Check if there was an RX Failure
   if (rxFail){
     rxFail = false;
-    Serial.println("DW1000 Receive Failure Detected");
+    pcln("DW1000 Receive Failure Detected", C_RED);
   }
 
   // Check if there was an RX Timeout
   if (rxTimeout){
     rxTimeout = false;
-    Serial.println("DW1000 Receive Timeout");
+    pcln("DW1000 Receive Timeout", C_RED);
   }
 }

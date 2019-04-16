@@ -1,4 +1,4 @@
-#define DEBUG 1
+#define DEBUG 2
 
 #define BLOCK_SERIAL_NODE false
 #define BLOCK_SERIAL_BASE true

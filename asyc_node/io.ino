@@ -3,14 +3,23 @@ int sectionIndents = 0;
 boolean isSection = false;
 
 void inc() {
+  if (isBase)
+    return;
+    
   indents ++;
 }
 
 void inc(int level) {
+  if (isBase)
+    return;
+
   indents += level;
 }
 
 void dec() {
+  if (isBase)
+    return;
+
   indents --;
   if (indents < 0)
     indents = 0;
@@ -19,6 +28,9 @@ void dec() {
 }
 
 void dec(int level) {
+  if (isBase)
+    return;
+
   indents -= level;
   if (indents < 0)
     indents = 0;
@@ -27,22 +39,34 @@ void dec(int level) {
 }
 
 void rst() {
+  if (isBase)
+    return;
+
   indents = 0;
   if (isSection && indents < sectionIndents)
     indents = sectionIndents;
 }
 
 void rst(int level) {
+  if (isBase)
+    return;
+
   indents = level;
   if (isSection && indents < sectionIndents)
     indents = sectionIndents;
 }
 
 void pind() {
+  if (isBase)
+    return;
+
   pind(indents);
 }
 
 void pind(int num) {
+  if (isBase)
+    return;
+
   if (num > 0) {
     uint8_t indentstr[num*2];
     for (int i = 0; i < num*2; i++) {
@@ -53,11 +77,17 @@ void pind(int num) {
 }
 
 void header(char * str, char * fg, char * bg) {
+  if (isBase)
+    return;
+
   sprintf(large_buf, "\n\r%s→ %s%s %-80s%s\n\r", C_PURPLE, bg, fg, str, D_CLEAR);
   Serial.println(large_buf);
 }
 
 void pcln(char * str) {
+  if (isBase)
+    return;
+
   if (DEBUG >= indents) {
     if (isSection) {
       pind(sectionIndents);
@@ -73,6 +103,9 @@ void pcln(char * str) {
 }
 
 void pcln(char * str, char * color) {
+  if (isBase)
+    return;
+
   if (DEBUG >= indents) {
     if (isSection) {
       pind(sectionIndents);
@@ -90,6 +123,9 @@ void pcln(char * str, char * color) {
 }
 
 void section(char * title) {
+  if (isBase)
+    return;
+
   if (DEBUG >= indents) {
     sectionIndents = indents;
     isSection = true;
@@ -101,6 +137,9 @@ void section(char * title) {
 }
 
 void section(char * title, char * color) {
+  if (isBase)
+    return;
+
   if (DEBUG >= indents) {
     isSection = true;
     sectionIndents = indents;
@@ -125,6 +164,9 @@ void section(char * title, char * color) {
 // }
 
 void endSection(){
+  if (isBase)
+    return;
+
   if (DEBUG >= sectionIndents) {
     isSection = false;
     indents = sectionIndents;
@@ -132,6 +174,9 @@ void endSection(){
 }
 
 void endSection(char * result){
+  if (isBase)
+    return;
+
   if (DEBUG >= sectionIndents) {
     Serial.print(D_CLEAR);
     pind();
@@ -143,6 +188,9 @@ void endSection(char * result){
 }
 
 void endSection(char * result, char * color){
+  if (isBase)
+    return;
+
   if (DEBUG >= sectionIndents) {
     Serial.print(D_CLEAR);
     pind();

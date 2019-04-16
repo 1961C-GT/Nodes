@@ -119,9 +119,9 @@ void handleSerial() {
   // ?*\n      -- Reset the base station only
 
   // SUPER basic serial interface lol
-  if (Serial5 && Serial5.available()) {
-    while(Serial5.available()) {
-      int c = Serial5.read();
+  if (Serial && Serial.available()) {
+    while(Serial.available()) {
+      int c = Serial.read();
 
       if (c == '?') {
         // Start of a command. Move on to the next charactor
@@ -183,18 +183,12 @@ void handleSerial() {
     }
   }
 
-  // Clear the Serial buffer
-  if (Serial && Serial.available()) {
-    while(Serial.available())
-      Serial.read();
-  }
-
   // Print out our incomming messages
   various_msg packet;
   uint8_t packet_id;
   while (getPacketFromBuffer(&packet, &packet_id)) {
 
-    if (!Serial5)
+    if (!Serial)
       continue;
 
     // continue;
@@ -204,25 +198,25 @@ void handleSerial() {
         {
           range_msg * msg = (range_msg *) &packet;
 
-          Serial5.print("Range Packet | Cycle:"); Serial5.print(cycle_counter);
-          Serial5.print(",\tFrom:"); Serial5.print(msg -> from);
-          Serial5.print(",\tTo:"); Serial5.print(msg -> to);
-          Serial5.print(",\tSeq:"); Serial5.print(msg -> seq);
-          Serial5.print(",\tHops:"); Serial5.print(msg -> hops);
-          Serial5.print(",\tRange:"); Serial5.println(msg -> range);
+          Serial.print("Range Packet | Cycle:"); Serial.print(cycle_counter);
+          Serial.print(",\tFrom:"); Serial.print(msg -> from);
+          Serial.print(",\tTo:"); Serial.print(msg -> to);
+          Serial.print(",\tSeq:"); Serial.print(msg -> seq);
+          Serial.print(",\tHops:"); Serial.print(msg -> hops);
+          Serial.print(",\tRange:"); Serial.println(msg -> range);
         }
         break;
       case STATUS_PACKET:
         {
           stats_msg * msg = (stats_msg *) &packet;
 
-          Serial5.print("Stats Packet | Cycle:"); Serial5.print(cycle_counter);
-          Serial5.print(",\tFrom:"); Serial5.print(msg->from);
-          Serial5.print(",\t\tSeq:"); Serial5.print(msg->seq);
-          Serial5.print(",\tHops:"); Serial5.print(msg->hops);
-          Serial5.print(",\tBat:"); Serial5.print(msg->bat * BATT_MEAS_COEFF);
-          Serial5.print(",\tTemp:"); Serial5.print(DW1000.convertTemp(msg->temp));
-          Serial5.print(",\tHeading:"); Serial5.println(msg->heading);
+          Serial.print("Stats Packet | Cycle:"); Serial.print(cycle_counter);
+          Serial.print(",\tFrom:"); Serial.print(msg->from);
+          Serial.print(",\t\tSeq:"); Serial.print(msg->seq);
+          Serial.print(",\tHops:"); Serial.print(msg->hops);
+          Serial.print(",\tBat:"); Serial.print(msg->bat * BATT_MEAS_COEFF);
+          Serial.print(",\tTemp:"); Serial.print(DW1000.convertTemp(msg->temp));
+          Serial.print(",\tHeading:"); Serial.println(msg->heading);
         }
         break;
       default:
@@ -343,13 +337,13 @@ void processMessage(Message msg){
           sprintf(medium_buf, "| → Range: %u", rm -> range); pcln(medium_buf);
 
         } else if (isBase){
-          Serial5.print("Discarded Range Packet due to Seq (Host: "); Serial5.print(msg.from);
-          Serial5.print(", Seq: "); Serial5.print(rm->seq);
-          Serial5.print(", From: "); Serial5.print(rm->from);
-          Serial5.print(", To: "); Serial5.print(rm->to);
-          Serial5.print(", Hops: "); Serial5.print(rm->hops);
-          Serial5.print(", Sendable: "); Serial5.print(packet_sendable[rm->from]);
-          Serial5.println(")");
+          Serial.print("Discarded Range Packet due to Seq (Host: "); Serial.print(msg.from);
+          Serial.print(", Seq: "); Serial.print(rm->seq);
+          Serial.print(", From: "); Serial.print(rm->from);
+          Serial.print(", To: "); Serial.print(rm->to);
+          Serial.print(", Hops: "); Serial.print(rm->hops);
+          Serial.print(", Sendable: "); Serial.print(packet_sendable[rm->from]);
+          Serial.println(")");
         } else {
           pcln("Range Packet Failed Seq or Hops", C_ORANGE);
           sprintf(medium_buf, "| → From:  %u", rm -> from); pcln(medium_buf);
@@ -383,7 +377,7 @@ void processMessage(Message msg){
         }
 
         else if (isBase){
-          Serial5.print("Discarded Stats Packet due to Seq (Host: "); Serial5.print(msg.from); Serial5.println(")");
+          Serial.print("Discarded Stats Packet due to Seq (Host: "); Serial.print(msg.from); Serial.println(")");
         //   Serial5.print(", Seq: "); Serial5.print(sm->seq);
         //   Serial5.print(", From: "); Serial5.print(sm->from);
         //   Serial5.print(", Hops: "); Serial5.print(sm->hops);

@@ -755,7 +755,7 @@ void rb_decode(struct State * state)
           sprintf(medium_buf, "| → From: %d", rxMessage.from); pcln(medium_buf, C_PURPLE);
           sprintf(medium_buf, "| → Seq: %d", rxMessage.seq); pcln(medium_buf, C_PURPLE);
           sprintf(medium_buf, "| → Distance: %d", dist); pcln(medium_buf, C_PURPLE);
-          Serial.println(dist);
+          // Serial.println(dist);
           // Store this range to the distance_meas array
           // distance_meas[rxMessage.from] = dist;
 
@@ -874,7 +874,7 @@ void com_acpt(struct State * state)
 
   // Set this block timer
   uint32_t delay = (settings.t_fs + settings.t_fr) + (settings.t_cl + settings.t_b + settings.t_rx) * nodeNumber + settings.t_bc * settings.n * bcst_blocks;
-  Serial.print("Calculated Delay:"); Serial.println(delay);
+  // Serial.print("Calculated Delay:"); Serial.println(delay);
   boolean prompt = setBlockTimer(delay, micros());
   if (!prompt) {
     pcln("Behind Schedule (Block Timer). Moving state", C_RED);
