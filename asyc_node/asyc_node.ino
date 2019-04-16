@@ -10,19 +10,18 @@
 // END IMPORTS
 
 // ========= Node IDs ========== //
-#define LEN_NODES_LIST 6
+#define LEN_NODES_LIST 5
 constexpr uint16_t nodeList[] = {
   0x2243, // BASE 1
-  0x5DCB, // BASE 2
+  0x805C, // BASE 2  // 0x5DCB
   0x6606, // NODE 1
   0xBFAA, // NODE 2
   0xDC19, // NODE 3
-  0x805C, // NODE 4
+  //0x805C, // NODE 4
 };
 
 constexpr Antenna_Delay antennaDelayList[] {
     LONG_ANTENNA, // BASE 1
-    SHORT_ANTENNA, // NODE 4
     LONG_ANTENNA, // BASE 2
     SHORT_ANTENNA, // NODE 1
     SHORT_ANTENNA, // NODE 2
@@ -171,8 +170,8 @@ void setup() {
     .channel = DW1000.CHANNEL_3,
 
     .n       = LEN_NODES_LIST,
-    .t_rx    = 2000,  // Buffer time for changing rx/tx mode // 1000
-    .t_b     = 2000,  // Buffer time between all blocks // 1000
+    .t_rx    = 4000,  // Buffer time for changing rx/tx mode // 1000
+    .t_b     = 4000,  // Buffer time between all blocks // 1000
 
     .t_r     = 9000,  // Time between range responses - longer than range_resp // 4000
                      //  message length (~3ms)
