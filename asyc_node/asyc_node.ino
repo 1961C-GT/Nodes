@@ -10,28 +10,23 @@
 // END IMPORTS
 
 // ========= Node IDs ========== //
-#define LEN_NODES_LIST 3
+#define LEN_NODES_LIST 6
 constexpr uint16_t nodeList[] = {
   0x2243, // BASE 1
-  0xDC19, // NODE 3
   0x805C, // NODE 4
-
+  0xDC19, // NODE 3
   0x6606, // NODE 1
   0x5DCB, // BASE 2
   0xBFAA, // NODE 2
-
-
 };
 
 constexpr Antenna_Delay antennaDelayList[] {
-    SHORT_ANTENNA, // BASE 2
-
     LONG_ANTENNA, // NODE 1
     LONG_ANTENNA, // NODE 2
     SHORT_ANTENNA, // NODE 3
-    LONG_ANTENNA, // NODE 4
-
-    SHORT_ANTENNA, // NODE 1
+    SHORT_ANTENNA, // NODE 3
+    SHORT_ANTENNA, // NODE 3
+    SHORT_ANTENNA, // NODE 3
 };
 // ========= Node IDs ========== //
 
@@ -201,7 +196,7 @@ void setup() {
                      //  length
     .t_s     = 5000,  // Time for the sleep frame
 
-    .power   = 0,// 0x1F1F1F1FL, // The manual transmit power
+    .power   = 0x1F1F1F1FL, // The manual transmit power
   };
 
   // Start up the real time clock and get the current time
